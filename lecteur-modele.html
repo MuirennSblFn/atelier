@@ -185,6 +185,8 @@ button { cursor: pointer; }
 .dé { display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; height: 1.7em; padding: 0 3px; border: 1.5px solid currentColor; border-radius: 4px; font-weight: 700; margin-right: 4px; }
 .victoire { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
 .victoire p { margin: 0; font-family: var(--police-recit); font-size: 19px; }
+.butin { border: 1px solid var(--trait); border-radius: 6px; padding: 10px 14px; background: var(--surface); }
+.butin ul { margin: 6px 0 0; padding-left: 18px; font-family: var(--police-recit); font-size: 17px; }
 
 /* Fiche complète */
 .fiche { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
@@ -473,7 +475,7 @@ button { cursor: pointer; }
       if (it === "garde") J.push("Il ne frappait pas : tour perdu."); else { J.push("Garde prudente."); blesse(coup(), true); }
     }
     c.journal.unshift("<b>Tour " + c.tour + " · " + INTENTS[it].toLowerCase() + "</b><br>" + J.join(" "));
-    if (c.vig <= 0) c.fini = "victoire";
+    if (c.vig <= 0) { c.fini = "victoire"; c.butin = appliquer((L.passages[P.cur].issue || {}).butin); }
     else if (s.vig <= 0) { c.fini = "defaite"; mourir(); render(); return; }
     else {
       c.idx++; c.tour++;
@@ -683,6 +685,7 @@ button { cursor: pointer; }
       h("div", null, h("div", { class: "n" }, h("span", { style: "font-weight:700;font-size:18px", text: nomHeros() }), h("small", { text: w.nom.toLowerCase() + " · armure " + w.armure })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / Math.max(1, eff("vigMax"))) + "%" })), h("small", { text: "Vigueur " + s.vig + " / " + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }))));
     if (c.fini === "victoire") {
       gauche.appendChild(h("div", { class: "victoire" }, h("p", { class: "ok", text: e.mort ? genre(e.mort) : "Ton adversaire s'effondre." }),
+        (c.butin || []).length ? h("div", { class: "butin" }, h("span", { class: "label", text: "Butin" }), h("ul", null, c.butin.map(function (t) { return h("li", { text: t }); }))) : null,
         h("div", null, h("button", { class: "b-prim", "data-focus": true, onclick: function () { P.combat = null; aller(is.victoire); } }, "Continuer"))));
     } else {
       gauche.appendChild(h("div", { class: "intention" }, h("span", { class: "label", text: "Tour " + c.tour + (c.vu ? "" : " · il prépare quelque chose") }), h("p", { text: genre(c.vu ? c.dit : c.voile) }),

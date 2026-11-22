@@ -824,6 +824,11 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         h("label", { class: "f" }, "Ennemi", selectEl(catOpts("ennemis", "— choisir un ennemi —"), is.ennemi || "", function (v) { is.ennemi = v; touch(); })),
         targetPicker(is, "victoire", touch, rerender, "Victoire →"),
         h("span", { class: "hint", text: "Pas de fuite une fois le combat engagé. En cas de défaite, le joueur reprend au début de l'acte." })));
+      is.butin = is.butin || [];
+      box.appendChild(h("div", { class: "card" },
+        h("strong", { text: "Butin" + (is.butin.length ? " · " + is.butin.length : "") }),
+        h("span", { class: "hint", text: "Ce que le joueur récupère sur l'ennemi vaincu : objets, or, un Mot, une information… Affiché dans la fenêtre de combat, à la victoire, avant « Continuer »." }),
+        fxEditor(is.butin, touch, rerender)));
     } else if (is.type === "fin") {
       box.appendChild(h("div", { class: "card" }, h("div", { class: "row" },
         h("label", { class: "f" }, "Type de fin", selectEl(FINS.map(function (f) { return [f, f]; }), is.fin || "Mort", function (v) { is.fin = v; touch(); })),
@@ -1116,6 +1121,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     box.appendChild(h("div", { class: "hint", text: "Vigueur ennemie " + c.vig + "/" + c.max + " · ta Vigueur " + s.vig + "/" + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }));
     if (c.over === "win") {
       box.appendChild(h("p", { class: "ok", text: e.mort ? genre(e.mort, P.setup.genre) : "Victoire." }));
+      if ((c.butin || []).length) box.appendChild(h("div", { class: "card" }, h("strong", { text: "Butin" }), h("ul", { style: "margin:4px 0 0;padding-left:18px" }, c.butin.map(function (t) { return h("li", { text: t }); }))));
       box.appendChild(is.victoire ? h("button", { class: "pv-choice", onclick: function () { go(is.victoire); } }, "Continuer") : h("p", { class: "ko", text: "Aucun passage n'est relié à la victoire." }));
     } else if (!c.over) {
       box.appendChild(h("div", { class: "cb-intent", text: genre(c.revealed ? c.said : c.veilSaid, P.setup.genre) }));
@@ -1197,7 +1203,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else { L.push("Garde prudente."); hurt(foeHit(), true); }
     }
     c.log.unshift("<b>Tour " + c.turn + " · " + INTENTS[it] + "</b> · " + L.join(" "));
-    if (c.vig <= 0) c.over = "win";
+    if (c.vig <= 0) { c.over = "win"; c.butin = applyFx(is.butin); }
     else if (s.vig <= 0) c.over = "lose";
     else {
       c.idx++; c.turn++;
@@ -1378,7 +1384,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     function add(lvl, p, msg) { out.push({ lvl: lvl, pid: p ? p.id : null, num: p ? p.num : "", msg: msg }); }
     var given = { objets: {}, mots: {}, infos: {} };
     function scanFx(list) { (list || []).forEach(function (f) { if (f.type === "donner") given.objets[f.val] = 1; if (f.type === "mot") given.mots[f.val] = 1; if (f.type === "info") given.infos[f.val] = 1; }); }
-    ps.forEach(function (p) { scanFx(p.effets); (p.segments || []).forEach(function (sg) { scanFx(sg.effets); }); ((p.issue || {}).choix || []).forEach(function (c) { scanFx(c.effets); }); });
+    ps.forEach(function (p) { scanFx(p.effets); (p.segments || []).forEach(function (sg) { scanFx(sg.effets); }); ((p.issue || {}).choix || []).forEach(function (c) { scanFx(c.effets); }); scanFx((p.issue || {}).butin); });
     var nums = {};
     ps.forEach(function (p) {
       if (!p.num) add("erreur", p, "Passage sans numéro.");
@@ -1774,7 +1780,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       var is = p.issue || {};
       if (is.type === "choix") (is.choix || []).forEach(function (c) { out.push("- " + genre(c.texte || "(sans texte)", g, "[Nom]") + " → " + (D.passages[c.cible] ? D.passages[c.cible].num : "?") + ((c.cond || []).length ? " *(si " + condTxt(c.cond) + ")*" : "")); });
       if (is.type === "test") out.push("- Test de " + STATS[is.stat || "hab"] + (is.modif ? " (" + is.modif + ")" : "") + " : réussite → " + ((D.passages[is.succes] || {}).num || "?") + ", échec → " + ((D.passages[is.echec] || {}).num || "?"));
-      if (is.type === "combat") out.push("- Combat : " + ((D.ennemis[is.ennemi] || {}).nom || "?") + " ; victoire → " + ((D.passages[is.victoire] || {}).num || "?"));
+      if (is.type === "combat") out.push("- Combat : " + ((D.ennemis[is.ennemi] || {}).nom || "?") + " ; victoire → " + ((D.passages[is.victoire] || {}).num || "?") + ((is.butin || []).length ? " ; butin : " + is.butin.length + " élément(s)" : ""));
       if (is.type === "fin") out.push("- **" + (is.fin || "Fin") + "** : " + (is.titreFin || ""));
       out.push("");
     });
@@ -1855,6 +1861,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>Les objets, Mots, informations et ennemis</b> se créent dans leurs onglets, puis se choisissent dans des listes. Une « information », c'est ce que le joueur a découvert : un indice, un nom, un secret (l'équivalent des mots-codes).</p>",
       "<p><b>L'aperçu</b> joue ton livre avec le vrai moteur. Change de genre, d'origine ou d'occupation pour vérifier tes variations.</p>",
       "<p><b>Les vérifications</b> listent les impasses, les liens cassés, les passages inaccessibles et les objets, Mots ou informations demandés mais jamais donnés. Définis ton passage de départ dans les Réglages pour qu'elles soient complètes.</p>",
+      "<p><b>Le butin :</b> dans un passage qui se termine par un combat, la carte « Butin » liste ce que le joueur récupère s'il gagne (objets, or, Mots, informations). Il le découvre dans la fenêtre de combat, avant « Continuer ».</p>",
       "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",
       "<p><b>La sauvegarde par acte :</b> coche « Début d'acte » sur le premier passage de chaque acte. Quand le joueur meurt, il y revient avec l'état qu'il avait en arrivant.</p>",
       "<p><b>L'onglet Jouer</b> lance une vraie partie depuis le passage de départ, avec création du personnage, comme le vivra ton lecteur.</p>",
