@@ -452,6 +452,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ["infos", "Informations", function () { return Object.keys(D.infos).length; }],
     ["verifs", "Vérifications", function () { return checks().filter(function (i) { return i.lvl === "erreur"; }).length || ""; }],
     ["reglages", "Réglages", null],
+    ["publier", "Publier et exporter", null],
     ["aide", "Aide", null]
   ];
   function renderTabs() {
@@ -472,7 +473,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var v = UI.view;
     if (v === "passages") main.appendChild(viewPassages());
     else if (v === "verifs") main.appendChild(viewChecks());
-    else if (v === "reglages") main.appendChild(viewReglages());
+    else if (v === "reglages" || v === "publier") main.appendChild(viewReglages());
     else if (v === "aide") main.appendChild(viewHelp());
     else if (v === "jouer") main.appendChild(viewPlay());
     else if (v === "graphe") { main.appendChild(viewGraph()); }
@@ -1629,13 +1630,18 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     b.appendChild(h("div", { class: "tbl-wrap" }, t2));
     b.appendChild(h("div", null, h("button", { class: "btn small", onclick: function () { r.occupations.push({ nom: "", fav: [], arme: "", degats: "1d6", attaque: "for", armure: 0, parade: 0 }); rerender(); } }, "+ occupation")));
     main.appendChild(b);
-    wrap.appendChild(main);
+    var pub = UI.view === "publier";
+    if (!pub) {
+      wrap.appendChild(main);
+      wrap.appendChild(h("p", { class: "hint", text: "Pour produire le jeu, télécharger une sauvegarde ou le livre en texte : onglet « Publier et exporter »." }));
+      return wrap;
+    }
 
     /* Sauvegarde */
-    wrap.appendChild(publishBox(r, touch, rerender));
-    if (GH) wrap.appendChild(githubSettingsBox());
+    var pb = publishBox(r, touch, rerender);
+    wrap.appendChild(pb.prod);
 
-    var bk = h("section", { class: "box" }, h("div", { class: "box-h" }, h("h2", { text: "Sauvegarde" })));
+    var bk = h("section", { class: "box" }, h("div", { class: "box-h" }, h("h2", { text: "Sauvegarde et livre en texte" })));
     var bb = h("div", { class: "box-b" });
     bb.appendChild(h("p", { class: "hint", text: "Ton livre est enregistré en ligne automatiquement. Pour garder une copie sur ton ordinateur, télécharge une sauvegarde de temps en temps. Elle sert aussi à restaurer le livre." }));
     var msg = h("span", { class: "hint" });
@@ -1667,6 +1673,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     }
     bk.appendChild(bb);
     wrap.appendChild(bk);
+    wrap.appendChild(pb.textes);
+    if (GH) wrap.appendChild(githubSettingsBox());
     return wrap;
   }
   var restoreDump = null;
@@ -1678,8 +1686,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     r.actesNoms = r.actesNoms || {};
     r.crimes = r.crimes || {};
     if (!r.exportActes) r.exportActes = { "1": true, "2": true, "3": true, "0": false };
-    var box = h("section", { class: "box", id: "publier" }, h("div", { class: "box-h" }, h("h2", { text: "Publier le jeu" }),
-      h("span", { class: "hint", text: "Ce qui ne sert qu'au jeu publié, puis le bouton pour le produire" })));
+    var box = h("section", { class: "box" }, h("div", { class: "box-h" }, h("h2", { text: "Textes propres au jeu publié" }),
+      h("span", { class: "hint", text: "Page de titre, prologue, crimes : ce que seul le lecteur voit" })));
     var b = h("div", { class: "box-b" });
     b.appendChild(h("div", { class: "grid2" },
       h("label", { class: "f" }, "Accroche (sous le titre)", h("input", { type: "text", value: r.accroche || "", placeholder: "ex. : Sous les ruines de l'abbaye d'Ivoire dort une cité que les vivants ont oubliée.", oninput: function (e) { r.accroche = e.target.value; touch(); } })),
@@ -1714,7 +1722,10 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     b.appendChild(h("div", { class: "tbl-wrap" }, t2));
     b.appendChild(h("label", { class: "f" }, "Message de fin de démo (quand le joueur atteint un passage non inclus)", h("textarea", { value: r.finDemo || "", placeholder: "Merci d'avoir joué ! Ton avis compte : dis à l'auteur ce qui t'a plu, ce qui t'a perdu, et ce que tu aurais voulu faire.", oninput: function (e) { r.finDemo = e.target.value; touch(); } })));
 
-    b.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Produire le fichier du jeu" })));
+    box.appendChild(b);
+    var prod = h("section", { class: "box", id: "publier" }, h("div", { class: "box-h" }, h("h2", { text: "Publier le jeu" }),
+      h("span", { class: "hint", text: "Le fichier à envoyer à tes testeurs" })));
+    b = h("div", { class: "box-b" });
     b.appendChild(h("div", { class: "mini-row" }, h("span", { class: "hint", text: "Actes inclus :" }),
       [["1", "Acte I"], ["2", "Acte II"], ["3", "Acte III"], ["0", "Sans acte"]].map(function (a) {
         return h("label", { class: "f inline" }, h("input", { type: "checkbox", checked: !!r.exportActes[a[0]], onchange: function (e) { r.exportActes[a[0]] = e.target.checked; touch(); } }), a[1]);
@@ -1724,8 +1735,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       h("button", { class: "btn primary", onclick: function () { publishGame(msg); } }, "Publier le jeu"),
       h("span", { class: "hint", text: "Un fichier .html qui contient tout : le jeu, ton texte, tes illustrations. Il s'ouvre dans n'importe quel navigateur, s'envoie par mail ou s'héberge où tu veux." })));
     b.appendChild(msg);
-    box.appendChild(b);
-    return box;
+    prod.appendChild(b);
+    return { prod: prod, textes: box };
   }
   function blobToDataURL(blob) {
     return new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(blob); });
@@ -1735,7 +1746,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var r = clone(R()), inc = r.exportActes || { "1": true, "2": true, "3": true, "0": true };
     function say(t, bad) { msg.textContent = t; msg.style.color = bad ? "var(--bad)" : ""; }
     if (!downloads) { say("Le téléchargement n'est disponible que dans claude.ai.", true); return; }
-    if (!r.depart || !D.passages[r.depart]) { say("Choisis d'abord un passage de départ, plus haut dans les Réglages.", true); return; }
+    if (!r.depart || !D.passages[r.depart]) { say("Choisis d'abord un passage de départ, dans l'onglet Réglages.", true); return; }
     var ps = {};
     Object.keys(D.passages).forEach(function (id) { var p = D.passages[id]; if (inc[String(p.acte || "0")]) { var c = clone(p); delete c.notes; delete c.statut; delete c.titre; delete c.maj; ps[id] = c; } });
     if (!ps[r.depart]) { say("Le passage de départ appartient à un acte que tu n'as pas coché.", true); return; }
@@ -1784,7 +1795,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       if (is.type === "fin") out.push("- **" + (is.fin || "Fin") + "** : " + (is.titreFin || ""));
       out.push("");
     });
-    var d = new Date(), name = "livre-prive-" + (g === "f" ? "feminin" : g === "n" ? "neutre" : "masculin") + "-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".md";
+    var d = new Date(), name = "kepultum-livre-" + (g === "f" ? "feminin" : g === "n" ? "neutre" : "masculin") + "-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".md";
     downloads.save({ filename: name, data: out.join("\n") }).then(function () { msg.textContent = "Livre téléchargé."; }, function (e) { msg.textContent = e && e.code === "declined" ? "Téléchargement annulé." : "Le téléchargement n'est pas disponible ici."; });
   }
 
@@ -1852,7 +1863,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<li><code>accusé·e</code> devient « accusé », « accusée », et reste « accusé·e » au neutre. Avec un pluriel : <code>prêt·e·s</code>.</li>",
       "<li><code>{il|elle|iel}</code>, <code>{heureux|heureuse|heureux·se}</code>, <code>{un aventurier|une aventurière|un·e aventurier·e}</code> : masculin, féminin, neutre, séparés par des barres. Si tu n'écris que deux formes, le neutre reprend la forme masculine, et les Vérifications te le signalent.</li>",
       "<li>Les boutons au-dessus du texte insèrent ces marques pour toi. L'aperçu te permet de basculer d'un genre à l'autre.</li></ul>",
-      "<p><b>Publier le jeu :</b> dans les Réglages, la section « Publier le jeu » réunit ce qui ne sert qu'au lecteur (accroche, prologue, noms des actes, descriptions des occupations, crimes) et produit un fichier .html autonome. Envoie-le à tes testeurs : il s'ouvre dans n'importe quel navigateur, et leur progression s'enregistre dans leur navigateur. Un passage d'un acte non inclus devient la « fin de la démo ».</p>",
+      "<p><b>Publier le jeu :</b> dans l'onglet « Publier et exporter », la section « Publier le jeu » réunit ce qui ne sert qu'au lecteur (accroche, prologue, noms des actes, descriptions des occupations, crimes) et produit un fichier .html autonome. Envoie-le à tes testeurs : il s'ouvre dans n'importe quel navigateur, et leur progression s'enregistre dans leur navigateur. Un passage d'un acte non inclus devient la « fin de la démo ».</p>",
       "<p><b>Le nom du héros :</b> écris <code>{nom}</code> là où le nom choisi par le joueur doit apparaître, par exemple « C'est {elle|lui|iel}, {nom} ! ». S'il n'en donne pas, le nom par défaut des Réglages s'affiche.</p>",
       "<p><b>Formes neutres usuelles</b> (il n'existe pas de norme unique ; choisis-en une et garde-la dans tout le livre) : il/elle → <i>iel</i> ; ils/elles → <i>iels</i> ; le/la → <i>lae</i> ; celui/celle → <i>cellui</i> ; ceux/celles → <i>celleux</i> ; lui/elle (après une préposition) → <i>ellui</i> ; un/une → <i>un·e</i> ; mon/ma → <i>mon</i> devant voyelle, sinon <i>man</i> ou <i>mon·a</i>. Le genre neutre peut se désactiver dans les Réglages.</p>",
       "<p><b>Les variations selon le personnage</b>, de deux façons, à combiner librement :</p><ul>",
@@ -1865,7 +1876,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",
       "<p><b>La sauvegarde par acte :</b> coche « Début d'acte » sur le premier passage de chaque acte. Quand le joueur meurt, il y revient avec l'état qu'il avait en arrivant.</p>",
       "<p><b>L'onglet Jouer</b> lance une vraie partie depuis le passage de départ, avec création du personnage, comme le vivra ton lecteur.</p>",
-      "<p><b>Relire ton livre :</b> dans les Réglages, « Livre en texte » télécharge tout ton livre dans un fichier lisible, en version masculine ou féminine.</p>",
+      "<p><b>Relire ton livre :</b> dans l'onglet « Publier et exporter », « Livre en texte » télécharge tout ton livre dans un fichier lisible, en version masculine ou féminine.</p>",
       "<p><b>Mise en forme :</b> <code>*italique*</code>. Laisse une ligne vide entre deux paragraphes.</p>"
     ].join("") }));
     return s;
