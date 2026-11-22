@@ -240,12 +240,12 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
   var STATUTS = { afaire: "À écrire", brouillon: "Brouillon", ecrit: "Écrit", relu: "Relu" };
   var FINS = ["Bonne fin", "Fin douce-amère", "Mauvaise fin", "Fin d'évasion", "Échec", "Mort"];
-  var COLS = ["passages", "objets", "mots", "infos", "ennemis"];
+  var COLS = ["passages", "objets", "mots", "infos", "fragments", "ennemis"];
 
-  var D = { passages: {}, objets: {}, mots: {}, infos: {}, ennemis: {}, reglages: null };
+  var D = { passages: {}, objets: {}, mots: {}, infos: {}, fragments: {}, ennemis: {}, reglages: null };
   var UI = { view: "passages", sel: null, q: "", acte: "tous", catSel: {}, preview: true, confirmDel: false };
   var db = null, assets = null, downloads = null, offline = false, GH = null;
-  var loaded = { passages: false, objets: false, mots: false, infos: false, ennemis: false, reglages: false };
+  var loaded = { passages: false, objets: false, mots: false, infos: false, fragments: false, ennemis: false, reglages: false };
 
   var DEFAULT_REGLAGES = {
     titre: "Aventures en Képultum",
@@ -450,6 +450,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ["objets", "Objets", function () { return Object.keys(D.objets).length; }],
     ["mots", "Mots", function () { return Object.keys(D.mots).length; }],
     ["infos", "Informations", function () { return Object.keys(D.infos).length; }],
+    ["fragments", "Fragments", function () { return Object.keys(D.fragments).length; }],
     ["verifs", "Vérifications", function () { return checks().filter(function (i) { return i.lvl === "erreur"; }).length || ""; }],
     ["reglages", "Réglages", null],
     ["publier", "Publier et exporter", null],
@@ -698,7 +699,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ["origine", "Origine est"], ["occupation", "Occupation est"], ["genre", "Genre est"],
     ["objet", "Possède l'objet"], ["sansobjet", "Ne possède pas l'objet"], ["mot", "Connaît le Mot"],
     ["info", "Connaît l'information"], ["sansinfo", "Ne connaît pas l'information"],
-    ["stat", "Caractéristique"], ["usure", "Usure"], ["compteur", "Compteur de l'Ordre"], ["visite", "A déjà visité le passage"], ["pasvisite", "N'a jamais visité le passage"]
+    ["stat", "Caractéristique"], ["usure", "Usure"], ["compteur", "Compteur de l'Ordre"], ["fragment", "A trouvé le fragment"], ["visite", "A déjà visité le passage"], ["pasvisite", "N'a jamais visité le passage"]
   ];
   function condEditor(list, touch, rerender, title) {
     var box = h("div", { class: "sec" });
@@ -726,6 +727,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       if (c.type === "objet") row.appendChild(h("label", { class: "f inline" }, "quantité ≥", h("input", { type: "number", min: 1, value: c.n || 1, oninput: function (e) { c.n = +e.target.value || 1; touch(); } })));
     }
     else if (c.type === "mot") row.appendChild(selectEl(catOpts("mots", "— Mot —"), c.val || "", set("val")));
+    else if (c.type === "fragment") row.appendChild(selectEl(catOpts("fragments", "— fragment —"), c.val || "", set("val")));
     else if (c.type === "info" || c.type === "sansinfo") row.appendChild(selectEl(catOpts("infos", "— information —"), c.val || "", set("val")));
     else if (c.type === "visite" || c.type === "pasvisite") row.appendChild(selectEl(passageOpts(), c.val || "", set("val")));
     else {
@@ -738,7 +740,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   /* Effets */
   var FX_TYPES = [
     ["donner", "Donner l'objet"], ["retirer", "Retirer l'objet"], ["mot", "Apprendre le Mot"],
-    ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["stat", "Modifier une caractéristique"],
+    ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["fragment", "Trouver le fragment de lore"], ["stat", "Modifier une caractéristique"],
     ["lancer", "Prononcer le Mot (coûte son Mana)"], ["usure", "Ajouter de l'Usure"], ["compteur", "Avancer le compteur de l'Ordre"]
   ];
   function fxEditor(list, touch, rerender) {
@@ -752,6 +754,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         row.appendChild(selectEl(catOpts("objets", "— objet —"), f.val || "", set("val")));
         row.appendChild(h("label", { class: "f inline" }, "×", h("input", { type: "number", min: 1, value: f.n || 1, oninput: function (e) { f.n = +e.target.value || 1; touch(); } })));
       } else if (f.type === "mot" || f.type === "lancer") row.appendChild(selectEl(catOpts("mots", "— Mot —"), f.val || "", set("val")));
+      else if (f.type === "fragment") row.appendChild(selectEl(catOpts("fragments", "— fragment —"), f.val || "", set("val")));
       else if (f.type === "info" || f.type === "oubli") row.appendChild(selectEl(catOpts("infos", "— information —"), f.val || "", set("val")));
       else {
         if (f.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), f.stat || "vig", set("stat")));
@@ -903,7 +906,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     s.vigMax = s.for + 6 + (fav.indexOf("vig") >= 0 ? 2 : 0);
     s.manMax = s.sag + 2 + (fav.indexOf("man") >= 0 ? 2 : 0);
     s.vig = s.vigMax; s.man = s.manMax; s.cha = Math.floor(s.hab / 2);
-    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], temp: [], vus: {}, cur: null, log: [], combat: null, test: null, start: null, save: null };
+    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], frag: [], temp: [], vus: {}, cur: null, log: [], combat: null, test: null, start: null, save: null };
   }
   function defaultSetup() {
     if (UI.setup) return UI.setup;
@@ -932,6 +935,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       case "mot": return P.mots.indexOf(c.val) >= 0;
       case "info": return P.infos.indexOf(c.val) >= 0;
       case "sansinfo": return P.infos.indexOf(c.val) < 0;
+      case "fragment": return (P.frag || []).indexOf(c.val) >= 0;
       case "visite": return !!P.vus[c.val];
       case "pasvisite": return !P.vus[c.val];
       case "stat": return cmp(eff(c.stat || "for"));
@@ -956,6 +960,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       }
       else if (f.type === "mot" && f.val && P.mots.indexOf(f.val) < 0) { P.mots.push(f.val); nm = D.mots[f.val]; out.push("Mot appris : " + (nm ? nm.nom : "?")); }
       else if (f.type === "info" && f.val && P.infos.indexOf(f.val) < 0) { P.infos.push(f.val); nm = D.infos[f.val]; out.push("Information : " + (nm ? nm.nom : "?")); }
+      else if (f.type === "fragment" && f.val) { P.frag = P.frag || []; if (P.frag.indexOf(f.val) < 0) { P.frag.push(f.val); nm = D.fragments[f.val]; out.push("Fragment de lore : " + (nm ? nm.nom : "?")); } }
       else if (f.type === "oubli" && f.val) { P.infos = P.infos.filter(function (x) { return x !== f.val; }); }
       else if (f.type === "stat") {
         var k = f.stat || "vig";
@@ -1038,7 +1043,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var inv = Object.keys(P.inv).map(function (k) { return (D.objets[k] ? D.objets[k].nom : "?") + (P.inv[k] > 1 ? " ×" + P.inv[k] : ""); });
     var mots = P.mots.map(function (k) { return D.mots[k] ? D.mots[k].nom : "?"; });
     var infos = P.infos.map(function (k) { return D.infos[k] ? D.infos[k].nom : "?"; });
-    b.appendChild(h("div", { class: "pv-inv", html: "<b>Sac :</b> " + (inv.length ? esc(inv.join(", ")) : "vide") + (mots.length ? " · <b>Mots :</b> " + esc(mots.join(", ")) : "") + (infos.length ? " · <b>Informations :</b> " + esc(infos.join(", ")) : "") }));
+    var frags = (P.frag || []).map(function (k) { return D.fragments[k] ? D.fragments[k].nom : "?"; });
+    b.appendChild(h("div", { class: "pv-inv", html: "<b>Sac :</b> " + (inv.length ? esc(inv.join(", ")) : "vide") + (mots.length ? " · <b>Mots :</b> " + esc(mots.join(", ")) : "") + (infos.length ? " · <b>Informations :</b> " + esc(infos.join(", ")) : "") + (frags.length ? " · <b>Fragments :</b> " + esc(frags.join(", ")) : "") }));
     var equipables = Object.keys(P.inv).filter(function (k) { return slotOf(D.objets[k]); });
     if (equipables.length) b.appendChild(h("div", { class: "toolbar" }, equipables.map(function (k) {
       var o = D.objets[k], sl = slotOf(o), on = P.eq[sl] === k;
@@ -1424,8 +1430,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   function checks() {
     var out = [], ps = sortedPassages();
     function add(lvl, p, msg) { out.push({ lvl: lvl, pid: p ? p.id : null, num: p ? p.num : "", msg: msg }); }
-    var given = { objets: {}, mots: {}, infos: {} };
-    function scanFx(list) { (list || []).forEach(function (f) { if (f.type === "donner") given.objets[f.val] = 1; if (f.type === "mot") given.mots[f.val] = 1; if (f.type === "info") given.infos[f.val] = 1; }); }
+    var given = { objets: {}, mots: {}, infos: {}, fragments: {} };
+    function scanFx(list) { (list || []).forEach(function (f) { if (f.type === "donner") given.objets[f.val] = 1; if (f.type === "mot") given.mots[f.val] = 1; if (f.type === "info") given.infos[f.val] = 1; if (f.type === "fragment") given.fragments[f.val] = 1; }); }
     ps.forEach(function (p) { scanFx(p.effets); (p.segments || []).forEach(function (sg) { scanFx(sg.effets); }); ((p.issue || {}).choix || []).forEach(function (c) { scanFx(c.effets); }); scanFx((p.issue || {}).butin); });
     var nums = {};
     ps.forEach(function (p) {
@@ -1460,7 +1466,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
           if (c.type === "objet" && c.val && !given.objets[c.val]) add("erreur", p, where + " demande « " + (D.objets[c.val] ? D.objets[c.val].nom : "?") + " », que rien ne donne.");
           if (c.type === "mot" && c.val && !given.mots[c.val]) add("erreur", p, where + " demande le « " + (D.mots[c.val] ? D.mots[c.val].nom : "?") + " », que rien n'apprend.");
           if (c.type === "info" && c.val && !given.infos[c.val]) add("erreur", p, where + " demande l'information « " + (D.infos[c.val] ? D.infos[c.val].nom : "?") + " », que rien ne donne.");
-          if (["objet", "sansobjet", "mot", "info", "sansinfo", "origine", "occupation", "visite", "pasvisite"].indexOf(c.type) >= 0 && !c.val) add("attention", p, where + " a une condition incomplète.");
+          if (["objet", "sansobjet", "mot", "info", "sansinfo", "fragment", "origine", "occupation", "visite", "pasvisite"].indexOf(c.type) >= 0 && !c.val) add("attention", p, where + " a une condition incomplète.");
         });
       }
       (p.segments || []).forEach(function (s, i) { if (i > 0) scanCond(s.cond, "Un bloc conditionnel"); });
@@ -1533,6 +1539,11 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ] },
     infos: { titre: "Informations", un: "une information", fields: [
       ["nom", "Nom court (ex. : Le vrai nom de Mognus)", "text"], ["desc", "Ce que le joueur a appris", "area"], ["notes", "Notes", "area"]
+    ] },
+    fragments: { titre: "Fragments de lore", un: "un fragment", fields: [
+      ["nom", "Titre (ex. : Journal d'un moine, page déchirée)", "text"], ["collection", "Collection (ex. : Journal du moine) : regroupe les fragments dans le Carnet", "text"],
+      ["ordre", "Ordre dans la collection", "number"], ["texte", "Texte du fragment (*italique*, paragraphes séparés par une ligne vide, mot·e et {m|f|n} acceptés)", "longarea"],
+      ["notes", "Notes", "area"]
     ] }
   };
   function viewCatalog(col) {
@@ -1581,7 +1592,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else if (f[2] === "atksel") el = selectEl([["for", "Force"], ["hab", "Habileté"]], cur[k] || "for", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "bonussel") el = selectEl([["", "aucune"], ["for", "Force"], ["hab", "Habileté"], ["sag", "Sagesse"], ["cha", "Chance"], ["vigMax", "Vigueur maximum"], ["manMax", "Mana maximum"]], cur[k] || "", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "motsel") el = selectEl([["annule", "Annule l'action de l'ennemi"], ["degats", "Inflige des dégâts (ignore la Défense)"], ["soin", "Rend de la Vigueur"], ["recit", "Aucun : seulement dans le récit"]], cur[k] || "recit", function (v) { cur[k] = v; touch(); });
-      var wide = f[2] === "area";
+      if (f[2] === "longarea") el = h("textarea", { value: cur[k] || "", rows: 16, style: "min-height:320px;font-family:Georgia,serif;font-size:15px;font-weight:400;line-height:1.55", oninput: function (e) { cur[k] = e.target.value; touch(); } });
+      var wide = f[2] === "area" || f[2] === "longarea";
       grid.appendChild(f[2] === "bool" ? h("label", { class: "f inline" }, el, f[1]) : h("label", { class: "f", style: wide ? "grid-column:1/-1" : null }, f[1], el));
     });
     b.appendChild(grid);
@@ -1599,6 +1611,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       (p.segments || []).forEach(function (sg) { scan(sg.cond); scan(sg.effets); });
       var is = p.issue || {};
       (is.choix || []).forEach(function (c) { scan(c.cond); scan(c.effets); });
+      scan(is.butin);
       if (is.ennemi === id) hit = true;
       return hit;
     }).map(function (p) { return p.id; });
@@ -1612,6 +1625,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       (p.segments || []).forEach(function (s) { scan(s.cond); scan(s.effets); });
       var is = p.issue || {};
       (is.choix || []).forEach(function (c) { scan(c.cond); scan(c.effets); });
+      scan(is.butin);
       if (col === "ennemis" && is.ennemi === id) n++;
     });
     return n;
@@ -1810,7 +1824,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     chain.then(function () { return fetch("lecteur-modele.html"); }).then(function (res) { if (!res.ok) throw new Error("modele"); return res.text(); }).then(function (tpl) {
       delete r.exportActes;
       var livre = { id: slug(r.titre), demo: d.toLocaleDateString("fr-FR"), reglages: r, passages: ps };
-      ["objets", "mots", "infos", "ennemis"].forEach(function (c) { livre[c] = {}; Object.keys(D[c]).forEach(function (id) { var o = clone(D[c][id]); delete o.notes; delete o.maj; livre[c][id] = o; }); });
+      ["objets", "mots", "infos", "fragments", "ennemis"].forEach(function (c) { livre[c] = {}; Object.keys(D[c]).forEach(function (id) { var o = clone(D[c][id]); delete o.notes; delete o.maj; livre[c][id] = o; }); });
       var json = JSON.stringify(livre).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
       var html = tpl.split("__LIVRE_JSON__").join(json).split("{{TITRE}}").join(esc(r.titre || "Livre"));
       return downloads.save({ filename: slug(r.titre) + "-demo-" + stamp + ".html", data: html }).then(function () {
@@ -1918,6 +1932,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>L'aperçu</b> joue ton livre avec le vrai moteur. Change de genre, d'origine ou d'occupation pour vérifier tes variations.</p>",
       "<p><b>Les vérifications</b> listent les impasses, les liens cassés, les passages inaccessibles et les objets, Mots ou informations demandés mais jamais donnés. Définis ton passage de départ dans les Réglages pour qu'elles soient complètes.</p>",
       "<p><b>Les effets temporaires :</b> un objet utilisable peut donner un bonus (ou un malus) qui ne dure qu'un temps : jusqu'à la fin du combat, pendant quelques tours de combat, ou pendant quelques passages (le passage où on l'utilise compte pour un). Exemple : une potion de rage, +3 aux dégâts jusqu'à la fin du combat. Chaque objet porte un seul effet temporaire. Un objet peut aussi cumuler un effet immédiat (soin) et un effet temporaire. Réutiliser le même objet relance sa durée, sans cumuler.</p>",
+      "<p><b>Les fragments de lore :</b> des textes à collectionner (une page de journal, une lettre, une légende) que le joueur range dans son Carnet et relit quand il veut, même depuis la page de titre. Écris-les dans l'onglet Fragments ; donne-les avec l'effet « Trouver le fragment de lore » (à l'entrée d'un passage, sur un choix, ou en butin). Les fragments d'une même collection sont regroupés et triés par leur ordre ; ceux pas encore trouvés apparaissent comme « ? ? ? ». Un fragment trouvé le reste, même après une mort ou une nouvelle partie.</p>",
       "<p><b>Le butin :</b> dans un passage qui se termine par un combat, la carte « Butin » liste ce que le joueur récupère s'il gagne (objets, or, Mots, informations). Il le découvre dans la fenêtre de combat, avant « Continuer ».</p>",
       "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",
       "<p><b>La sauvegarde par acte :</b> coche « Début d'acte » sur le premier passage de chaque acte. Quand le joueur meurt, il y revient avec l'état qu'il avait en arrivant.</p>",

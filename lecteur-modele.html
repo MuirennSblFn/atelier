@@ -211,6 +211,11 @@ button { cursor: pointer; }
 .ecran-fin h1 { margin: 0; font-size: clamp(38px, 5vw, 58px); line-height: 1.05; }
 .fins { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .fins li { padding: 8px 12px; border: 1px solid var(--trait); border-radius: 5px; }
+.fins li.frag-ok { padding: 0; }
+.frag-lien { display: block; width: 100%; text-align: left; background: none; border: 0; color: var(--ivoire); font: inherit; padding: 8px 12px; cursor: pointer; }
+.frag-lien:hover, .frag-lien:focus-visible { background: rgba(255,255,255,.04); }
+.frag-nouv { margin: 8px 0 0; padding: 6px 14px; font-size: 14px; }
+.frag-texte { font-size: var(--taille-recit, 20px); }
 .fins li.cachee { border-style: dashed; border-color: var(--trait-doux); color: #5a5262; }
 .fins li.actuelle { border-color: #5c5234; color: var(--ivoire); }
 .bilan { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 16px; border-top: 1px solid var(--trait-doux); }
@@ -236,7 +241,7 @@ button { cursor: pointer; }
   var L = JSON.parse(document.getElementById("livre-data").textContent);
   var R = L.reglages || {};
   R.origines = R.origines || []; R.occupations = R.occupations || [];
-  L.passages = L.passages || {}; L.objets = L.objets || {}; L.mots = L.mots || {}; L.infos = L.infos || {}; L.ennemis = L.ennemis || {};
+  L.passages = L.passages || {}; L.objets = L.objets || {}; L.mots = L.mots || {}; L.infos = L.infos || {}; L.fragments = L.fragments || {}; L.ennemis = L.ennemis || {};
   var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance" };
   var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
   var EXPL = { for: "Frapper, parer, forcer une porte.", hab: "Esquiver, grimper, se faufiler.", sag: "Percevoir, comprendre, lire les gestes d'un ennemi." };
@@ -319,7 +324,7 @@ button { cursor: pointer; }
     s.vigMax = s.for + 6 + (fav.indexOf("vig") >= 0 ? 2 : 0);
     s.manMax = s.sag + 2 + (fav.indexOf("man") >= 0 ? 2 : 0);
     s.vig = s.vigMax; s.man = s.manMax; s.cha = Math.floor(s.hab / 2);
-    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], temp: [], vus: {}, cur: null, combat: null, test: null, fx: [], save: null, morts: 0, lus: 0 };
+    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], frag: [], temp: [], vus: {}, cur: null, combat: null, test: null, fx: [], save: null, morts: 0, lus: 0 };
   }
   function equipes() { var out = []; if (!P) return out; ["arme", "armure", "talisman"].forEach(function (sl) { var id = P.eq[sl]; if (id && L.objets[id] && P.inv[id] > 0) out.push(L.objets[id]); }); return out; }
   function bonus(k) { return equipes().reduce(function (n, o) { return n + (o.bonus_stat === k ? (+o.bonus_val || 0) : 0); }, 0) + tempB(k); }
@@ -388,6 +393,7 @@ button { cursor: pointer; }
       case "mot": return P.mots.indexOf(c.val) >= 0;
       case "info": return P.infos.indexOf(c.val) >= 0;
       case "sansinfo": return P.infos.indexOf(c.val) < 0;
+      case "fragment": return (P.frag || []).indexOf(c.val) >= 0 || fragsTrouves().indexOf(c.val) >= 0;
       case "visite": return !!P.vus[c.val];
       case "pasvisite": return !P.vus[c.val];
       case "stat": return cmp(eff(c.stat || "for"));
@@ -412,6 +418,10 @@ button { cursor: pointer; }
         P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax"));
       } else if (f.type === "mot" && f.val && P.mots.indexOf(f.val) < 0) { P.mots.push(f.val); o = L.mots[f.val]; out.push("Mot appris : " + (o ? o.nom : "?")); }
       else if (f.type === "info" && f.val && P.infos.indexOf(f.val) < 0) { P.infos.push(f.val); o = L.infos[f.val]; out.push("Tu sais désormais : " + (o ? o.nom : "?")); }
+      else if (f.type === "fragment" && f.val && L.fragments[f.val]) {
+        P.frag = P.frag || []; if (P.frag.indexOf(f.val) < 0) P.frag.push(f.val);
+        if (fragsTrouves().indexOf(f.val) < 0) { var ft = fragsTrouves(); ft.push(f.val); store(":fragments", ft); out.push("Fragment de lore : " + L.fragments[f.val].nom); UI.fragNouv = (UI.fragNouv || []).concat(f.val); }
+      }
       else if (f.type === "oubli" && f.val) P.infos = P.infos.filter(function (x) { return x !== f.val; });
       else if (f.type === "stat") {
         var k = f.stat || "vig";
@@ -452,11 +462,19 @@ button { cursor: pointer; }
     if (P.s.vig <= 0) mourir();
     sauver(); render(); window.scrollTo(0, 0);
   }
-  function aller(pid, fx) { var pre = appliquer(fx); entrer(pid, pre); }
+  function aller(pid, fx, garderFrag) { if (!garderFrag) UI.fragNouv = []; var pre = appliquer(fx); entrer(pid, pre); }
   function mourir() { P.morts++; UI.ecran = "mort"; sauver(); }
   function noterFin(pid) { var f = load(":fins") || []; if (f.indexOf(pid) < 0) { f.push(pid); store(":fins", f); } }
+  function fragsTrouves() { return (load(":fragments") || []).filter(function (k) { return L.fragments[k]; }); }
+  function tousFrags() {
+    return Object.keys(L.fragments).sort(function (a, b) {
+      var x = L.fragments[a], y = L.fragments[b], cx = x.collection || "", cy = y.collection || "";
+      if (cx !== cy) return cx < cy ? -1 : 1;
+      return ((+x.ordre || 0) - (+y.ordre || 0)) || String(x.nom || "").localeCompare(String(y.nom || ""));
+    });
+  }
   function toutesFins() { return Object.keys(L.passages).filter(function (k) { return (L.passages[k].issue || {}).type === "fin"; }); }
-  function reprendreActe() { var sv = P.save, morts = P.morts; P = clone(sv); P.save = sv; P.morts = morts; P.combat = null; P.test = null; var p = L.passages[P.cur]; if (p && (p.issue || {}).type === "combat") P.combat = nouveauCombat(p.issue.ennemi); P.fx = ["Tu reprends au début de l'acte."]; UI.ecran = "jeu"; sauver(); render(); window.scrollTo(0, 0); }
+  function reprendreActe() { UI.fragNouv = []; var sv = P.save, morts = P.morts; P = clone(sv); P.save = sv; P.morts = morts; P.combat = null; P.test = null; var p = L.passages[P.cur]; if (p && (p.issue || {}).type === "combat") P.combat = nouveauCombat(p.issue.ennemi); P.fx = ["Tu reprends au début de l'acte."]; UI.ecran = "jeu"; sauver(); render(); window.scrollTo(0, 0); }
 
   /* ---------- Combat ---------- */
   function ennemi(id) { return L.ennemis[id] || null; }
@@ -540,6 +558,7 @@ button { cursor: pointer; }
     if (UI.modal === "fiche") calque.appendChild(modalFiche());
     else if (UI.modal === "regles") calque.appendChild(modalRegles());
     else if (UI.modal === "fins") calque.appendChild(modalFins());
+    else if (UI.modal === "carnet") calque.appendChild(modalCarnet());
     else if (UI.modal === "menu") calque.appendChild(modalMenu());
     else if (UI.ecran === "jeu" && P && P.combat && !P.combat.manque) calque.appendChild(fenetreCombat());
     var focus = calque.querySelector("[data-focus]") || app.querySelector("[data-focus]");
@@ -565,6 +584,7 @@ button { cursor: pointer; }
     nav.appendChild(h("div", { style: "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px" },
       h("button", { class: "b-sec", onclick: function () { UI.modal = "fins"; render(); } }, "Fins · " + fins.filter(function (x) { return L.passages[x]; }).length + " / " + toutesFins().length),
       h("button", { class: "b-sec", onclick: function () { UI.modal = "regles"; render(); } }, "Règles du jeu")));
+    if (Object.keys(L.fragments).length) nav.appendChild(h("button", { class: "b-sec", onclick: function () { UI.fragLu = null; UI.modal = "carnet"; render(); } }, "Carnet · " + fragsTrouves().length + " / " + Object.keys(L.fragments).length + " fragments"));
     s.appendChild(nav);
     s.appendChild(h("p", { class: "pied", text: [R.auteur ? "Un livre de " + R.auteur : "", L.demo ? "Démo du " + L.demo : ""].filter(Boolean).join(" · ") }));
     return s;
@@ -663,7 +683,7 @@ button { cursor: pointer; }
     if (!L.passages[R.depart]) { alertLivre("Ce livre n'a pas de passage de départ."); return; }
     P = nouveauPerso(clone(UI.setup));
     UI.modal = null;
-    entrer(R.depart);
+    UI.fragNouv = []; entrer(R.depart);
   }
   function alertLivre(t) { app.innerHTML = ""; app.appendChild(h("main", { class: "ecran-mort pad" }, h("p", { text: t }))); }
 
@@ -678,6 +698,7 @@ button { cursor: pointer; }
         h("span", { class: "jauge mana", title: "Mana" }, h("span", { class: "t", text: "Mana" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.man / Math.max(1, mm)) + "%" })), h("b", { text: String(s.man) })),
         h("span", { class: "usure" }, h("span", { class: "t", style: "color:var(--texte-doux)", text: "Usure " }), h("b", { text: String(P.usure) })),
         h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.modal = "fiche"; render(); } }, "Fiche"),
+        Object.keys(L.fragments).length ? h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.fragLu = null; UI.modal = "carnet"; render(); } }, "Carnet") : null,
         h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.modal = "menu"; render(); } }, "Menu")));
   }
   function ecranJeu() {
@@ -689,6 +710,7 @@ button { cursor: pointer; }
     a.appendChild(h("div", { class: "numero", "aria-label": "Passage " + p.num }, h("span"), h("b", { text: p.num }), h("span")));
     var fx = (P.fx || []).filter(Boolean);
     if (fx.length) a.appendChild(h("p", { class: "gains", text: fx.join(" · ") }));
+    (UI.fragNouv || []).forEach(function (fid) { if (L.fragments[fid]) a.appendChild(h("button", { class: "b-sec frag-nouv", onclick: function () { UI.fragLu = fid; UI.modal = "carnet"; render(); } }, "Lire « " + L.fragments[fid].nom + " »")); });
     if ((P.temp || []).length) a.appendChild(h("p", { class: "gains", style: "opacity:.8", text: "En cours : " + P.temp.map(function (t) { return tempTxt(t); }).join(" · ") }));
     var r = h("div", { class: "recit", tabindex: "-1", "data-focus": true });
     (p.segments || []).forEach(function (sg, i) { if (i === 0 || tousOk(sg.cond)) r.insertAdjacentHTML("beforeend", riche(sg.texte)); });
@@ -733,7 +755,7 @@ button { cursor: pointer; }
     if (c.fini === "victoire") {
       gauche.appendChild(h("div", { class: "victoire" }, h("p", { class: "ok", text: e.mort ? genre(e.mort) : "Ton adversaire s'effondre." }),
         (c.butin || []).length ? h("div", { class: "butin" }, h("span", { class: "label", text: "Butin" }), h("ul", null, c.butin.map(function (t) { return h("li", { text: t }); }))) : null,
-        h("div", null, h("button", { class: "b-prim", "data-focus": true, onclick: function () { P.combat = null; aller(is.victoire); } }, "Continuer"))));
+        h("div", null, h("button", { class: "b-prim", "data-focus": true, onclick: function () { P.combat = null; aller(is.victoire, null, true); } }, "Continuer"))));
     } else {
       gauche.appendChild(h("div", { class: "intention" }, h("span", { class: "label", text: "Tour " + c.tour + (c.vu ? "" : " · il prépare quelque chose") }), h("p", { text: genre(c.vu ? c.dit : c.voile) }),
         aides ? h("div", { class: "aide", text: INTENTS[c.it] + " · " + { lourd: "lent et puissant : esquive, puis contre-attaque.", rapides: "une série de coups secs : pare-les.", garde: "il est vulnérable : frappe !", incant: "frappe pour interrompre le sort." }[c.it] }) : null));
@@ -815,6 +837,25 @@ button { cursor: pointer; }
     toutes.forEach(function (pid) { var p = L.passages[pid], is = p.issue || {}, vu = vues.indexOf(pid) >= 0; ul.appendChild(h("li", { class: vu ? null : "cachee", text: vu ? (is.titreFin || is.fin) + " · " + (is.fin || "") : "? ? ?" })); });
     if (!toutes.length) ul.appendChild(h("li", { class: "cachee", text: "Aucune fin dans cette démo." }));
     return fenetre("Fins découvertes · " + vues.filter(function (x) { return L.passages[x]; }).length + " / " + toutes.length, ul);
+  }
+  function modalCarnet() {
+    var trouves = fragsTrouves(), tous = tousFrags();
+    if (UI.fragLu && L.fragments[UI.fragLu] && trouves.indexOf(UI.fragLu) >= 0) {
+      var fr = L.fragments[UI.fragLu];
+      return fenetre(fr.nom || "Fragment", h("div", { class: "corps" },
+        fr.collection ? h("p", { class: "label", text: fr.collection }) : null,
+        h("div", { class: "recit frag-texte", html: riche(fr.texte || "") }),
+        h("div", { style: "margin-top:18px" }, h("button", { class: "b-sec", onclick: function () { UI.fragLu = null; render(); } }, "← Retour au Carnet"))));
+    }
+    var corps = h("div", { class: "corps" }), coll = null, ul = null;
+    tous.forEach(function (fid) {
+      var fr = L.fragments[fid], c = fr.collection || "";
+      if (!ul || c !== coll) { coll = c; if (c) corps.appendChild(h("p", { class: "label", style: "margin-top:12px", text: c })); ul = h("ul", { class: "fins" }); corps.appendChild(ul); }
+      var vu = trouves.indexOf(fid) >= 0;
+      ul.appendChild(vu ? h("li", { class: "frag-ok" }, h("button", { class: "frag-lien", onclick: function () { UI.fragLu = fid; render(); } }, fr.nom || "Fragment")) : h("li", { class: "cachee", text: "? ? ?" }));
+    });
+    if (!tous.length) corps.appendChild(h("p", { class: "vide", text: "Aucun fragment dans ce livre." }));
+    return fenetre("Carnet · " + trouves.length + " / " + tous.length, corps);
   }
   function modalMenu() {
     var taille = load(":taille") || 20;
