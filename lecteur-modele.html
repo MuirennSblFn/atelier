@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{TITRE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=Alegreya:ital,wght@0,400;0,600;1,400&family=IM+Fell+English+SC&display=swap">
+<style>
+/* =====================================================================
+   APPARENCE DU JEU — tout l'habillage se règle ici, dans ces variables.
+   ===================================================================== */
+:root {
+  --fond: #131116;
+  --fond-lueur: #2a2230;
+  --surface: #1b1820;
+  --surface-2: #231f29;
+  --bande: #17151b;
+  --trait: #383241;
+  --trait-doux: #2c2732;
+  --texte: #e8e1d2;
+  --texte-recit: #e3dccd;
+  --texte-doux: #9d9486;
+  --texte-pale: #6f6878;
+  --ivoire: #dccba4;
+  --ivoire-encre: #1a1714;
+  --thanergie: #84c0b2;
+  --sang: #c0503f;
+  --sang-clair: #e27461;
+  --mousse: #93b376;
+  --or: #c9a44d;
+  --police-titre: 'IM Fell English SC', 'Iowan Old Style', Georgia, serif;
+  --police-recit: 'Alegreya', 'Iowan Old Style', Georgia, serif;
+  --police-ui: 'Alegreya Sans', 'Segoe UI', system-ui, sans-serif;
+  --taille-recit: 20px;
+  --largeur-lecture: 680px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--fond); color: var(--texte); font-family: var(--police-ui); font-size: 16px; line-height: 1.5; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--thanergie); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.wrap { min-height: 100%; display: flex; flex-direction: column; }
+.pad { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Boutons */
+.b-prim { display: inline-flex; justify-content: center; align-items: center; gap: 8px; padding: 13px 26px; background: var(--ivoire); color: var(--ivoire-encre); border: 0; border-radius: 4px; font-weight: 700; font-size: 17px; text-decoration: none; }
+.b-prim:hover { filter: brightness(1.06); }
+.b-prim:disabled { opacity: .45; cursor: not-allowed; }
+.b-sec { display: inline-flex; justify-content: center; align-items: center; padding: 10px 18px; background: transparent; border: 1px solid #4a4252; border-radius: 4px; color: var(--texte); font-size: 15px; }
+.b-sec:hover { border-color: var(--ivoire); }
+.b-lien { background: none; border: 0; color: var(--texte-doux); padding: 8px 4px; font-size: 15px; }
+.b-lien:hover { color: var(--texte); }
+.titre-f { font-family: var(--police-titre); font-weight: 400; color: var(--ivoire); }
+.label { font-size: 13px; letter-spacing: .2em; text-transform: uppercase; color: var(--texte-doux); font-weight: 500; margin: 0; }
+
+/* Page de titre */
+.ecran-titre { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 36px; text-align: center; padding-block: 48px; background: radial-gradient(ellipse 70% 60% at 50% 30%, var(--fond-lueur) 0%, var(--fond) 70%); }
+.ecran-titre h1 { margin: 0; font-size: clamp(44px, 8vw, 84px); line-height: 1; text-wrap: balance; }
+.ornement { display: flex; align-items: center; gap: 14px; justify-content: center; }
+.ornement span { display: block; width: 90px; height: 1px; background: #5a5262; }
+.ornement i { display: block; width: 8px; height: 8px; border: 1px solid var(--thanergie); transform: rotate(45deg); }
+.accroche { margin: 0; max-width: 560px; font-family: var(--police-recit); font-style: italic; font-size: 21px; color: #c9c0b0; }
+.menu { display: flex; flex-direction: column; gap: 10px; width: min(380px, 100%); }
+.menu .b-sec { flex-direction: column; gap: 2px; }
+.menu small { color: var(--texte-doux); font-size: 13px; }
+.pied { font-size: 13px; color: var(--texte-pale); }
+
+/* Création */
+.entete { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; padding-block: 18px; border-bottom: 1px solid var(--trait-doux); }
+.entete .titre-f { font-size: 22px; }
+.etapes { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 0; list-style: none; font-size: 14px; color: var(--texte-pale); }
+.etapes li[aria-current="step"] { color: var(--ivoire); font-weight: 700; }
+.etapes li.fait { color: var(--texte-doux); }
+.creation { flex: 1; width: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; padding-block: 30px; }
+.creation h2 { margin: 0; font-size: clamp(32px, 4vw, 44px); }
+.sous { margin: 0; font-family: var(--police-recit); font-style: italic; font-size: 19px; color: #b8af9f; }
+.champ input { width: min(320px, 100%); padding: 10px 14px; background: var(--surface); border: 1px solid #4a4252; border-radius: 4px; font-family: var(--police-recit); font-size: 20px; }
+.seg { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg button { padding: 10px 20px; background: transparent; border: 1px solid #4a4252; border-radius: 4px; font-size: 16px; }
+.seg button[aria-pressed="true"] { background: #22302d; border: 1.5px solid var(--thanergie); font-weight: 700; }
+.cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 12px; }
+.carte { text-align: left; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--surface); border: 1px solid var(--trait); border-radius: 6px; }
+.carte[aria-pressed="true"] { background: #22302d; border: 1.5px solid var(--thanergie); }
+.carte .nom { font-family: var(--police-titre); font-size: 20px; color: var(--ivoire); line-height: 1.15; }
+.carte .desc { font-size: 14px; line-height: 1.45; color: #b8af9f; }
+.carte .jeu { margin-top: auto; font-size: 13px; color: var(--thanergie); }
+.detail { display: flex; flex-direction: column; gap: 10px; padding: 20px 22px; background: var(--surface); border: 1px solid var(--trait); border-radius: 6px; }
+.detail h3 { margin: 0; font-size: 28px; }
+.detail p { margin: 0; font-family: var(--police-recit); font-size: 18px; line-height: 1.6; color: #d6cebf; }
+.detail .infos { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 15px; color: #b8af9f; }
+.detail .infos b { color: var(--texte); }
+.carac { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.carac > div { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 14px 16px; background: var(--surface); border-radius: 6px; }
+.carac b { font-size: 17px; }
+.carac .val { font-size: 24px; font-weight: 700; color: var(--ivoire); text-align: right; }
+.carac .val small { font-size: 13px; font-weight: 400; color: var(--thanergie); }
+.carac .expl { grid-column: 1 / -1; font-size: 13.5px; color: var(--texte-doux); }
+.derives { display: flex; flex-wrap: wrap; gap: 10px 28px; padding: 14px 16px; background: var(--surface); border-radius: 6px; }
+.derives div { text-align: center; }
+.derives b { display: block; font-size: 21px; }
+.derives span { font-size: 13px; color: var(--texte-doux); }
+.navcrea { display: flex; justify-content: space-between; align-items: center; padding-block: 18px 28px; width: 100%; max-width: 1100px; margin: 0 auto; }
+.crime { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+@media (max-width: 860px) { .crime { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
+.avis { margin: 0; font-size: 13px; letter-spacing: .24em; text-transform: uppercase; color: var(--sang); }
+.recit { font-family: var(--police-recit); font-size: var(--taille-recit); line-height: 1.7; color: var(--texte-recit); }
+.recit p { margin: 0 0 .75em; }
+.recit p:last-child { margin-bottom: 0; }
+
+/* Fiche résumée */
+.fiche-mini { display: flex; flex-direction: column; gap: 12px; padding: 20px 22px; background: var(--surface); border: 1px solid var(--trait); border-radius: 6px; }
+.fiche-mini h3 { margin: 0; font-size: 26px; }
+.grille6 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; text-align: center; }
+.grille6 div { padding: 8px; background: var(--surface-2); border-radius: 4px; }
+.grille6 b { display: block; font-size: 20px; }
+.grille6 span { font-size: 12.5px; color: var(--texte-doux); }
+
+/* Jeu */
+.barre { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; padding-block: 12px; background: var(--bande); border-bottom: 1px solid var(--trait-doux); }
+.barre .titre-f { font-size: 20px; }
+.barre .acte { font-size: 14px; color: var(--texte-doux); }
+.barre .stats { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; font-size: 14px; }
+.jauge { display: inline-flex; align-items: center; gap: 8px; }
+.jauge .t { color: var(--texte-doux); }
+.jauge .j { display: block; width: 100px; height: 7px; background: var(--trait-doux); border-radius: 4px; overflow: hidden; }
+.jauge .j i { display: block; height: 100%; background: var(--sang); transition: width .4s; }
+.jauge.mana .j i { background: var(--thanergie); }
+.usure b { color: var(--or); }
+.lecture { flex: 1; width: 100%; max-width: var(--largeur-lecture); margin: 0 auto; display: flex; flex-direction: column; gap: 18px; padding-block: 26px 48px; }
+.illus { width: 100%; border-radius: 6px; display: block; }
+.numero { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.numero span { display: block; width: 60px; height: 1px; background: var(--trait); }
+.numero b { font-family: var(--police-titre); font-weight: 400; font-size: 34px; color: var(--ivoire); line-height: 1; }
+.gains { margin: 0; font-size: 14px; color: var(--thanergie); }
+.choix { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
+.choix button { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 16px; min-height: 48px; border: 1px solid var(--trait); border-radius: 5px; background: var(--surface); font-family: var(--police-recit); font-size: 18px; }
+.choix button:hover:not(:disabled) { border-color: var(--ivoire); }
+.choix button::before { content: "➤"; color: var(--ivoire); }
+.choix .bloque { display: flex; flex-direction: column; gap: 3px; padding: 12px 16px; border: 1px dashed var(--trait-doux); border-radius: 5px; color: var(--texte-pale); font-family: var(--police-recit); font-size: 18px; }
+.choix .bloque s { text-decoration-thickness: 1px; }
+.choix .bloque em { font-family: var(--police-ui); font-size: 14px; }
+.test { display: flex; flex-wrap: wrap; align-items: center; gap: 24px 32px; padding: 24px 28px; background: var(--surface); border: 1px solid var(--trait); border-radius: 6px; }
+.de { position: relative; width: 110px; height: 110px; flex: none; }
+.de svg { width: 100%; height: 100%; }
+.de b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 38px; }
+.de.roule { animation: roule .6s ease-out; }
+@keyframes roule { from { transform: rotate(-200deg) scale(.5); opacity: 0; } to { transform: none; opacity: 1; } }
+.test .res { display: flex; flex-direction: column; gap: 6px; }
+.test .verdict { font-family: var(--police-titre); font-size: 32px; }
+.ok { color: var(--mousse); } .ko { color: var(--sang-clair); } .mag { color: var(--thanergie); }
+
+/* Fenêtres */
+.voile { position: fixed; inset: 0; z-index: 50; background: rgba(8, 7, 10, .72); display: flex; align-items: center; justify-content: center; padding: 20px max(12px, env(safe-area-inset-right, 0px)) 20px max(12px, env(safe-area-inset-left, 0px)); }
+.fenetre { width: 100%; max-width: 1000px; max-height: calc(100vh - 40px); overflow: auto; background: var(--surface); border: 1px solid #4a4252; border-radius: 10px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); display: flex; flex-direction: column; }
+.fenetre > header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 22px; border-bottom: 1px solid var(--trait-doux); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.fenetre > header h2 { margin: 0; font-size: 26px; }
+.fenetre .corps { padding: 18px 22px 22px; }
+.combat { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 22px; }
+@media (max-width: 760px) { .combat { grid-template-columns: minmax(0, 1fr); } }
+.duel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.duel .n { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.duel .n b { font-family: var(--police-titre); font-weight: 400; font-size: 21px; color: var(--ivoire); }
+.duel .j { display: block; height: 8px; background: var(--trait-doux); border-radius: 4px; overflow: hidden; margin: 6px 0 4px; }
+.duel .j i { display: block; height: 100%; background: var(--sang); transition: width .4s; }
+.duel small { font-size: 13.5px; color: var(--texte-doux); }
+.intention { margin-top: 14px; padding: 16px 20px; background: var(--surface-2); border-left: 3px solid var(--ivoire); border-radius: 0 6px 6px 0; }
+.intention p { margin: 6px 0 0; font-family: var(--police-recit); font-style: italic; font-size: 22px; line-height: 1.45; }
+.aide { margin-top: 6px; font-size: 14px; color: var(--thanergie); }
+.actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 8px; margin-top: 14px; }
+.actions button { text-align: left; padding: 10px 12px; background: #18161c; border: 1px solid var(--trait); border-radius: 5px; }
+.actions button:hover:not(:disabled) { border-color: var(--ivoire); }
+.actions button:disabled { opacity: .4; cursor: not-allowed; }
+.actions b { display: block; font-size: 16px; }
+.actions small { font-size: 13px; color: var(--texte-doux); }
+.actions .mot b { color: var(--thanergie); }
+.actions .obs b { color: var(--ivoire); }
+.journal { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: var(--bande); border: 1px solid var(--trait-doux); border-radius: 6px; max-height: 420px; overflow: auto; }
+.journal ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.45; color: #b8af9f; }
+.journal li:first-child { color: var(--texte); }
+.dé { display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; height: 1.7em; padding: 0 3px; border: 1.5px solid currentColor; border-radius: 4px; font-weight: 700; margin-right: 4px; }
+.victoire { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+.victoire p { margin: 0; font-family: var(--police-recit); font-size: 19px; }
+
+/* Fiche complète */
+.fiche { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+@media (max-width: 860px) { .fiche { grid-template-columns: minmax(0, 1fr); } }
+.fiche section { display: flex; flex-direction: column; gap: 12px; padding: 4px 22px 18px; border-right: 1px solid var(--trait-doux); }
+.fiche section:last-child { border-right: 0; }
+.ligne { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 12px; background: var(--surface-2); border-radius: 5px; }
+.ligne small { display: block; font-size: 13px; color: var(--texte-doux); }
+.pastille { font-size: 12.5px; color: var(--thanergie); border: 1px solid #3f5f58; border-radius: 99px; padding: 2px 9px; background: none; }
+.usure-boite { display: flex; flex-direction: column; gap: 6px; padding: 14px; border: 1px solid #4a3f24; border-radius: 6px; background: #1f1b17; }
+.usure-boite p { margin: 0; font-size: 14px; color: #b8af9f; }
+.mot-carte { padding: 12px 14px; border: 1px solid #3f5f58; border-radius: 6px; background: #1a2422; }
+.mot-carte p { margin: 6px 0 0; font-family: var(--police-recit); font-size: 16px; color: #c9c0b0; }
+.savoirs { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-family: var(--police-recit); font-size: 16px; color: #c9c0b0; }
+.vide { color: var(--texte-pale); font-size: 14px; }
+
+/* Mort, fin */
+.ecran-mort { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; text-align: center; padding-block: 48px; background: radial-gradient(ellipse 60% 55% at 50% 45%, #2a1416 0%, #0d0b0e 75%); }
+.ecran-mort h1 { margin: 0; font-size: clamp(56px, 9vw, 88px); line-height: 1; color: var(--sang-clair); }
+.ecran-fin { flex: 1; width: 100%; max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 56px; padding-block: 56px; align-items: start; }
+@media (max-width: 860px) { .ecran-fin { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-block: 32px; } }
+.ecran-fin h1 { margin: 0; font-size: clamp(38px, 5vw, 58px); line-height: 1.05; }
+.fins { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.fins li { padding: 8px 12px; border: 1px solid var(--trait); border-radius: 5px; }
+.fins li.cachee { border-style: dashed; border-color: var(--trait-doux); color: #5a5262; }
+.fins li.actuelle { border-color: #5c5234; color: var(--ivoire); }
+.bilan { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-top: 16px; border-top: 1px solid var(--trait-doux); }
+.bilan b { display: block; font-size: 22px; }
+.bilan span { font-size: 13.5px; color: var(--texte-doux); }
+.panneau { display: flex; flex-direction: column; gap: 20px; padding: 22px 24px; background: var(--surface); border: 1px solid var(--trait); border-radius: 6px; }
+
+@media (max-width: 640px) {
+  .barre .stats { margin-left: 0; width: 100%; }
+  .jauge .j { width: 70px; }
+  :root { --taille-recit: 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .de.roule { animation: none; } .jauge .j i, .duel .j i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div id="calque"></div>
+<script id="livre-data" type="application/json">__LIVRE_JSON__</script>
+<script>
+(function () {
+  "use strict";
+  var L = JSON.parse(document.getElementById("livre-data").textContent);
+  var R = L.reglages || {};
+  R.origines = R.origines || []; R.occupations = R.occupations || [];
+  L.passages = L.passages || {}; L.objets = L.objets || {}; L.mots = L.mots || {}; L.infos = L.infos || {}; L.ennemis = L.ennemis || {};
+  var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance" };
+  var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
+  var EXPL = { for: "Frapper, parer, forcer une porte.", hab: "Esquiver, grimper, se faufiler.", sag: "Percevoir, comprendre, lire les gestes d'un ennemi." };
+  var ACTES = ["", "I", "II", "III"];
+  var CLE = "kepultum:" + (L.id || R.titre || "livre");
+  var app = document.getElementById("app"), calque = document.getElementById("calque");
+
+  /* ---------- Outils ---------- */
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k === "text") el.textContent = v;
+      else if (k === "html") el.innerHTML = v;
+      else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), v);
+      else if (k === "value") el.value = v;
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
+    return el;
+  }
+  function add(el, c) {
+    if (c === null || c === undefined || c === false) return;
+    if (Array.isArray(c)) { c.forEach(function (x) { add(el, x); }); return; }
+    el.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(String(c)) : c);
+  }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function rnd(n) { return 1 + Math.floor(Math.random() * n); }
+  function parseDice(s) {
+    s = String(s || "").replace(/\s/g, "");
+    var m = s.match(/^(\d*)d(\d+)([+-]\d+)?$/i);
+    if (m) return [parseInt(m[1] || "1", 10), parseInt(m[2], 10), parseInt(m[3] || "0", 10)];
+    var n = parseInt(s, 10); return [0, 0, isNaN(n) ? 0 : n];
+  }
+  function roll(spec) { var t = spec[2]; for (var i = 0; i < spec[0]; i++) t += rnd(spec[1]); return t; }
+  function lines(s) { return String(s || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean); }
+  function pick(a) { return a.length ? a[Math.floor(Math.random() * a.length)] : ""; }
+  function store(k, v) { try { if (v === undefined) localStorage.removeItem(CLE + k); else localStorage.setItem(CLE + k, JSON.stringify(v)); } catch (e) {} }
+  function load(k) { try { var v = localStorage.getItem(CLE + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function nomActe(a) { a = String(a || ""); if (!ACTES[+a]) return ""; var n = (R.actesNoms || {})[a]; return "Acte " + ACTES[+a] + (n ? " · " + n : ""); }
+
+  /* ---------- Texte : nom, genre, mise en forme ---------- */
+  function setupCourant() { return UI.ecran === "creation" ? UI.setup : P && P.setup; }
+  function nomHeros() { var st = setupCourant(); return (st && String(st.nom || "").trim()) || String(R.nomDefaut || "").trim() || "Voyageur"; }
+  function genre(text, g) {
+    var st = setupCourant();
+    g = g || (st && st.genre) || "m";
+    text = String(text || "").replace(/\{nom\}/gi, nomHeros());
+    text = text.replace(/\{([^{}]*\|[^{}]*)\}/g, function (_, inner) {
+      var parts = inner.split("|");
+      if (g === "f") return parts[1];
+      if (g === "n") return parts.length > 2 ? parts[2] : parts[0];
+      return parts[0];
+    });
+    if (g === "n") return text;
+    var f = g === "f";
+    text = text.replace(/([A-Za-zÀ-ÖØ-öø-ÿœŒæÆ'’-]+)·([A-Za-zÀ-ÖØ-öø-ÿœŒ]+)·([A-Za-zÀ-ÖØ-öø-ÿœŒ]+)/g, function (_, a, b, c) { return f ? a + b + c : a + c; });
+    text = text.replace(/([A-Za-zÀ-ÖØ-öø-ÿœŒæÆ'’-]+)·([A-Za-zÀ-ÖØ-öø-ÿœŒ]+)/g, function (_, a, b) { return f ? a + b : a; });
+    return text;
+  }
+  function riche(text, g) {
+    return String(genre(text, g) || "").split(/\n\s*\n/).map(function (para) {
+      var s = esc(para.trim()).replace(/\*([^*]+)\*/g, "<em>$1</em>").replace(/\n/g, "<br>");
+      return s ? "<p>" + s + "</p>" : "";
+    }).join("");
+  }
+
+  /* ---------- Personnage et règles ---------- */
+  var P = null;
+  var UI = { ecran: "titre", etape: 1, setup: null, modal: null };
+  function occOf(n) { return (R.occupations || []).filter(function (o) { return o.nom === n; })[0] || { fav: [] }; }
+  function origOf(n) { return (R.origines || []).filter(function (o) { return o.nom === n; })[0] || {}; }
+  function nouveauPerso(setup) {
+    var o = occOf(setup.occupation), fav = o.fav || [], r = setup.rolled;
+    var s = { for: +r.for, hab: +r.hab, sag: +r.sag };
+    ["for", "hab", "sag"].forEach(function (k) { if (fav.indexOf(k) >= 0) s[k] += 2; });
+    s.vigMax = s.for + 6 + (fav.indexOf("vig") >= 0 ? 2 : 0);
+    s.manMax = s.sag + 2 + (fav.indexOf("man") >= 0 ? 2 : 0);
+    s.vig = s.vigMax; s.man = s.manMax; s.cha = Math.floor(s.hab / 2);
+    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], vus: {}, cur: null, combat: null, test: null, fx: [], save: null, morts: 0, lus: 0 };
+  }
+  function equipes() { var out = []; if (!P) return out; ["arme", "armure", "talisman"].forEach(function (sl) { var id = P.eq[sl]; if (id && L.objets[id] && P.inv[id] > 0) out.push(L.objets[id]); }); return out; }
+  function bonus(k) { return equipes().reduce(function (n, o) { return n + (o.bonus_stat === k ? (+o.bonus_val || 0) : 0); }, 0); }
+  function eff(k) {
+    if (k === "vigMax") return P.s.vigMax + bonus("vigMax");
+    if (k === "manMax") return P.s.manMax + bonus("manMax");
+    if (k === "vig" || k === "man") return P.s[k];
+    return Math.max(0, (P.s[k] || 0) + bonus(k));
+  }
+  function slotOf(o) { return o && (o.categorie === "arme" || o.categorie === "armure" || o.categorie === "talisman") ? o.categorie : null; }
+  function arme() {
+    var o = occOf(P.setup.occupation);
+    var w = { nom: o.arme || "Arme", txt: o.degats || "1d6", atk: o.attaque || "for", armure: +o.armure || 0, parade: +o.parade || 0 };
+    var a = P.eq.arme && L.objets[P.eq.arme];
+    if (a && P.inv[P.eq.arme]) { w.nom = a.nom; w.txt = a.arme_degats || w.txt; w.atk = a.arme_attaque || w.atk; }
+    w.dmg = parseDice(w.txt);
+    equipes().forEach(function (x) { w.armure += +x.bonus_armure || 0; w.parade += +x.bonus_parade || 0; });
+    return w;
+  }
+  function condOk(c) {
+    function cmp(v) { var n = +c.n || 0; return c.op === "<=" ? v <= n : c.op === "==" ? v === n : v >= n; }
+    switch (c.type) {
+      case "origine": return P.setup.origine === c.val;
+      case "occupation": return P.setup.occupation === c.val;
+      case "genre": return P.setup.genre === (c.val || "m");
+      case "objet": return (P.inv[c.val] || 0) >= (+c.n || 1);
+      case "sansobjet": return !(P.inv[c.val] > 0);
+      case "mot": return P.mots.indexOf(c.val) >= 0;
+      case "info": return P.infos.indexOf(c.val) >= 0;
+      case "sansinfo": return P.infos.indexOf(c.val) < 0;
+      case "visite": return !!P.vus[c.val];
+      case "stat": return cmp(eff(c.stat || "for"));
+      case "usure": return cmp(P.usure);
+      case "compteur": return cmp(P.compteur);
+    }
+    return true;
+  }
+  function tousOk(list) { return (list || []).every(condOk); }
+  function appliquer(list) {
+    var out = [];
+    (list || []).forEach(function (f) {
+      var n = f.n == null ? 1 : +f.n, o;
+      if (f.type === "donner" && f.val) {
+        P.inv[f.val] = (P.inv[f.val] || 0) + (n || 1); o = L.objets[f.val];
+        out.push("+ " + (o ? o.nom : "objet") + (n > 1 ? " ×" + n : ""));
+        var sl = slotOf(o); if (sl && !P.eq[sl]) P.eq[sl] = f.val;
+      } else if (f.type === "retirer" && f.val) {
+        P.inv[f.val] = Math.max(0, (P.inv[f.val] || 0) - (n || 1));
+        if (!P.inv[f.val]) { delete P.inv[f.val]; Object.keys(P.eq).forEach(function (k) { if (P.eq[k] === f.val) delete P.eq[k]; }); }
+        o = L.objets[f.val]; out.push("− " + (o ? o.nom : "objet"));
+        P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax"));
+      } else if (f.type === "mot" && f.val && P.mots.indexOf(f.val) < 0) { P.mots.push(f.val); o = L.mots[f.val]; out.push("Mot appris : " + (o ? o.nom : "?")); }
+      else if (f.type === "info" && f.val && P.infos.indexOf(f.val) < 0) { P.infos.push(f.val); o = L.infos[f.val]; out.push("Tu sais désormais : " + (o ? o.nom : "?")); }
+      else if (f.type === "oubli" && f.val) P.infos = P.infos.filter(function (x) { return x !== f.val; });
+      else if (f.type === "stat") {
+        var k = f.stat || "vig";
+        if (k === "vig") P.s.vig = Math.max(0, Math.min(eff("vigMax"), P.s.vig + n));
+        else if (k === "man") P.s.man = Math.max(0, Math.min(eff("manMax"), P.s.man + n));
+        else P.s[k] = Math.max(0, P.s[k] + n);
+        out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
+      } else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure"); }
+      else if (f.type === "compteur") { P.compteur += n; }
+    });
+    return out;
+  }
+  function sauver() { if (P) store(":partie", P); }
+
+  /* ---------- Navigation dans le livre ---------- */
+  function entrer(pid, fxAvant) {
+    var p = L.passages[pid];
+    P.combat = null; P.test = null;
+    if (!p) { P.cur = pid; P.horsDemo = true; UI.ecran = "demofin"; sauver(); render(); return; }
+    P.horsDemo = false; P.cur = pid; P.fx = fxAvant || [];
+    if (!P.vus[pid]) {
+      P.fx = P.fx.concat(appliquer(p.effets));
+      (p.segments || []).forEach(function (sg, i) { if (i > 0 && (sg.effets || []).length && tousOk(sg.cond)) P.fx = P.fx.concat(appliquer(sg.effets)); });
+      P.lus++;
+    }
+    P.vus[pid] = true;
+    if (p.debutActe) { var snap = clone(P); snap.save = null; snap.combat = null; snap.test = null; P.save = snap; }
+    var is = p.issue || {};
+    if (is.type === "combat") P.combat = nouveauCombat(is.ennemi);
+    if (is.type === "fin") { UI.ecran = "fin"; noterFin(pid); }
+    else UI.ecran = "jeu";
+    if (P.s.vig <= 0) mourir();
+    sauver(); render(); window.scrollTo(0, 0);
+  }
+  function aller(pid, fx) { var pre = appliquer(fx); entrer(pid, pre); }
+  function mourir() { P.morts++; UI.ecran = "mort"; sauver(); }
+  function noterFin(pid) { var f = load(":fins") || []; if (f.indexOf(pid) < 0) { f.push(pid); store(":fins", f); } }
+  function toutesFins() { return Object.keys(L.passages).filter(function (k) { return (L.passages[k].issue || {}).type === "fin"; }); }
+  function reprendreActe() { var sv = P.save, morts = P.morts; P = clone(sv); P.save = sv; P.morts = morts; P.combat = null; P.test = null; var p = L.passages[P.cur]; if (p && (p.issue || {}).type === "combat") P.combat = nouveauCombat(p.issue.ennemi); P.fx = ["Tu reprends au début de l'acte."]; UI.ecran = "jeu"; sauver(); render(); window.scrollTo(0, 0); }
+
+  /* ---------- Combat ---------- */
+  function ennemi(id) { return L.ennemis[id] || null; }
+  function cycleDe(e, c) {
+    var c2 = lines(String(e.cycle2 || "").replace(/,/g, "\n")), c1 = lines(String(e.cycle1 || "lourd, rapides, garde").replace(/,/g, "\n"));
+    return (c.phase === 2 && c2.length ? c2 : c1).map(function (x) { x = x.toLowerCase(); return x.indexOf("lourd") >= 0 ? "lourd" : x.indexOf("rapide") >= 0 ? "rapides" : x.indexOf("garde") >= 0 ? "garde" : x.indexOf("incant") >= 0 ? "incant" : "lourd"; });
+  }
+  function nouveauCombat(eid) { var e = ennemi(eid); if (!e) return { manque: true }; var c = { eid: eid, vig: +e.vig || 10, max: +e.vig || 10, tour: 1, idx: 0, phase: 1, journal: [], fini: null }; tourSuivant(c); return c; }
+  function tourSuivant(c) {
+    var e = ennemi(c.eid), cy = cycleDe(e, c);
+    c.it = cy[c.idx % cy.length]; c.vu = !e.voile; c.observe = false;
+    c.dit = pick(lines(e["ph_" + c.it])) || INTENTS[c.it] + ".";
+    c.voile = pick(lines(c.it === "lourd" || c.it === "rapides" ? e.voile_a : e.voile_b)) || "Tu ne parviens pas à lire son geste.";
+  }
+  function seuils(c, e, w, aides) {
+    var it = c.it, t = { frapper: eff(w.atk) - (+e.def || 0), esquiver: eff("hab") - (+e.menace || 0), parer: eff("for") - (+e.menace || 0) + w.parade };
+    if (aides) { if (it === "garde") t.frapper += 3; if (it === "rapides" || it === "incant") t.esquiver -= 3; if (it === "lourd") t.parer -= 5; if (it === "incant") t.parer = null; }
+    return t;
+  }
+  function agir(a) {
+    var c = P.combat, e = ennemi(c.eid), w = arme(), s = P.s, it = c.it, J = [], vrai = seuils(c, e, w, true);
+    function d(r, ok) { return '<span class="dé ' + (ok ? "ok" : "ko") + '">' + r + "</span>"; }
+    function test(t, lbl) { var r = rnd(20), ok = t !== null && r <= t; J.push(d(r, ok) + lbl + " (" + r + (ok ? " ≤ " : " &gt; ") + (t === null ? "—" : t) + ")"); return ok; }
+    function coup() { if (it === "incant") return roll(parseDice(e.sort || "2d4+2")); return Math.max(0, roll(parseDice(e.degats || "1d6")) + (it === "lourd" ? 3 : 0) - w.armure); }
+    function blesse(n, moitie) { if (moitie) n = Math.ceil(n / 2); s.vig = Math.max(0, s.vig - n); J.push('<span class="ko">−' + n + " Vigueur</span>"); }
+    function frappe(mult, bonusT, lbl) { var ok = test(eff(w.atk) - (+e.def || 0) + (bonusT || 0), lbl); if (ok) { var dg = roll(w.dmg) * (mult || 1); c.vig = Math.max(0, c.vig - dg); J.push('<span class="ok">touché, −' + dg + (mult > 1 ? " (double)" : "") + "</span>"); } return ok; }
+    if (a === "observer") {
+      c.observe = true;
+      if (test(eff("sag"), "Tu observes")) { c.vu = true; J.push("Tu lis son geste : " + INTENTS[it].toLowerCase() + "."); } else J.push("Tu ne lis rien.");
+      c.journal.unshift("<b>Tour " + c.tour + "</b> · " + J.join(" ")); sauver(); render(); return;
+    }
+    if (a.indexOf("mot:") === 0) {
+      var m = L.mots[a.slice(4)], cout = +m.cout || 0, pris = Math.min(s.man, cout), reste = cout - pris;
+      s.man -= pris; P.usure += reste;
+      J.push('<span class="mag">' + esc(m.nom) + (reste ? " · la magie te ronge : +" + reste + " Usure" : "") + "</span>");
+      if (m.effet === "annule") J.push("Son action est annulée.");
+      else {
+        if (m.effet === "degats") { var dg = roll(parseDice(m.valeur || "2d6")); c.vig = Math.max(0, c.vig - dg); J.push('<span class="ok">−' + dg + "</span>"); }
+        if (m.effet === "soin") { var so = roll(parseDice(m.valeur || "1d6")); s.vig = Math.min(eff("vigMax"), s.vig + so); J.push('<span class="ok">+' + so + " Vigueur</span>"); }
+        if (c.vig > 0 && it !== "garde") blesse(coup());
+      }
+    } else if (a.indexOf("obj:") === 0) {
+      var oid = a.slice(4), o = L.objets[oid];
+      J.push(esc(o.nom) + " : " + appliquer([{ type: o.effet_stat === "usure" ? "usure" : "stat", stat: o.effet_stat, n: +o.effet_val || 0 }]).join(", "));
+      if (o.consommable) appliquer([{ type: "retirer", val: oid, n: 1 }]);
+      if (it !== "garde") blesse(coup());
+    } else if (a === "frapper") {
+      if (it === "lourd") { frappe(1, 0, "Tu frappes en premier"); if (c.vig > 0) blesse(coup()); }
+      else if (it === "rapides") { frappe(1, 0, "Échange de coups"); if (c.vig > 0) blesse(coup()); }
+      else if (it === "garde") { frappe(1, 3, "Tu frappes sa garde ouverte"); }
+      else { if (frappe(1, 0, "Tu frappes pour briser le sort")) J.push("Le sort se dissipe."); else if (c.vig > 0) blesse(coup()); }
+    } else if (a === "esquiver") {
+      if (it === "garde") J.push("Il ne frappait pas : tour perdu.");
+      else if (test(vrai.esquiver, "Tu esquives")) { if (it === "lourd") frappe(2, 0, "Contre-attaque"); }
+      else blesse(coup());
+    } else if (a === "parer") {
+      if (it === "garde") J.push("Il ne frappait pas : tour perdu.");
+      else if (it === "incant") { J.push("On ne pare pas la thanergie."); blesse(coup()); }
+      else { var ok = test(vrai.parer, "Tu pares"); if (ok && it === "lourd") blesse(coup(), true); else if (!ok) blesse(coup()); }
+    } else if (a === "prudente") {
+      if (it === "garde") J.push("Il ne frappait pas : tour perdu."); else { J.push("Garde prudente."); blesse(coup(), true); }
+    }
+    c.journal.unshift("<b>Tour " + c.tour + " · " + INTENTS[it].toLowerCase() + "</b><br>" + J.join(" "));
+    if (c.vig <= 0) c.fini = "victoire";
+    else if (s.vig <= 0) { c.fini = "defaite"; mourir(); render(); return; }
+    else {
+      c.idx++; c.tour++;
+      if (c.phase === 1 && lines(String(e.cycle2 || "").replace(/,/g, "\n")).length && c.vig <= c.max / 2) { c.phase = 2; c.idx = 0; c.journal.unshift('<span class="mag">' + esc(genre(e.phase || "Il change de rythme.")) + "</span>"); }
+      tourSuivant(c);
+    }
+    sauver(); render();
+  }
+
+  /* =====================================================================
+     Écrans
+     ===================================================================== */
+  function render() {
+    app.innerHTML = ""; calque.innerHTML = "";
+    var f = { titre: ecranTitre, prologue: ecranPrologue, creation: ecranCreation, jeu: ecranJeu, mort: ecranMort, fin: ecranFin, demofin: ecranDemoFin }[UI.ecran] || ecranTitre;
+    app.appendChild(f());
+    if (UI.modal === "fiche") calque.appendChild(modalFiche());
+    else if (UI.modal === "regles") calque.appendChild(modalRegles());
+    else if (UI.modal === "fins") calque.appendChild(modalFins());
+    else if (UI.modal === "menu") calque.appendChild(modalMenu());
+    else if (UI.ecran === "jeu" && P && P.combat && !P.combat.manque) calque.appendChild(fenetreCombat());
+    var focus = calque.querySelector("[data-focus]") || app.querySelector("[data-focus]");
+    if (focus) focus.focus({ preventScroll: true });
+  }
+  function ornement() { return h("div", { class: "ornement", "aria-hidden": "true" }, h("span"), h("i"), h("span")); }
+
+  function ecranTitre() {
+    var partie = load(":partie"), fins = load(":fins") || [];
+    var s = h("main", { class: "ecran-titre pad" });
+    s.appendChild(h("div", { style: "display:flex;flex-direction:column;align-items:center;gap:14px" },
+      h("p", { class: "label", style: "letter-spacing:.32em", text: "Un livre dont tu es le héros" }),
+      h("h1", { class: "titre-f", text: R.titre || "Sans titre" }),
+      ornement(),
+      R.accroche ? h("p", { class: "accroche", text: R.accroche }) : null));
+    var nav = h("nav", { class: "menu", "aria-label": "Menu principal" });
+    nav.appendChild(h("button", { class: "b-prim", "data-focus": true, onclick: function () { UI.setup = null; UI.etape = 1; UI.ecran = String(R.prologue || "").trim() ? "prologue" : "creation"; render(); } }, "Nouvelle partie"));
+    var pp = partie && partie.cur ? L.passages[partie.cur] : null;
+    if (partie && partie.cur && !(pp && (pp.issue || {}).type === "fin")) {
+      nav.appendChild(h("button", { class: "b-sec", onclick: function () { P = partie; UI.ecran = P.horsDemo ? "demofin" : P.s.vig <= 0 ? "mort" : pp && (pp.issue || {}).type === "fin" ? "fin" : "jeu"; render(); } },
+        h("span", { text: "Continuer" }), h("small", { text: [nomActe(pp && pp.acte), pp ? "passage " + pp.num : "", partie.setup.nom || ""].filter(Boolean).join(" · ") })));
+    }
+    nav.appendChild(h("div", { style: "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px" },
+      h("button", { class: "b-sec", onclick: function () { UI.modal = "fins"; render(); } }, "Fins · " + fins.filter(function (x) { return L.passages[x]; }).length + " / " + toutesFins().length),
+      h("button", { class: "b-sec", onclick: function () { UI.modal = "regles"; render(); } }, "Règles du jeu")));
+    s.appendChild(nav);
+    s.appendChild(h("p", { class: "pied", text: [R.auteur ? "Un livre de " + R.auteur : "", L.demo ? "Démo du " + L.demo : ""].filter(Boolean).join(" · ") }));
+    return s;
+  }
+
+  function ecranPrologue() {
+    var s = h("main", { class: "lecture pad", style: "justify-content:center;padding-block:64px" });
+    s.appendChild(h("p", { class: "label", text: "Prologue" }));
+    s.appendChild(h("div", { class: "recit", html: riche(R.prologue, "m") }));
+    s.appendChild(h("div", null, h("button", { class: "b-prim", "data-focus": true, onclick: function () { UI.ecran = "creation"; UI.etape = 1; render(); } }, "Créer ton personnage")));
+    return s;
+  }
+
+  /* ---------- Création ---------- */
+  function ecranCreation() {
+    var st = UI.setup = UI.setup || { nom: "", genre: "m", origine: (R.origines[0] || {}).nom || "", occupation: (R.occupations[0] || {}).nom || "", rolled: null, relances: 2 };
+    var crimes = !!((R.crimes && Object.keys(R.crimes).length) || false);
+    var noms = ["Qui es-tu ?", "Ton métier", "Ton corps et ton esprit", crimes ? "Ton crime" : "Ta fiche"];
+    var w = h("div", { class: "wrap" });
+    var ol = h("ol", { class: "etapes" });
+    noms.forEach(function (n, i) { ol.appendChild(h("li", { "aria-current": UI.etape === i + 1 ? "step" : null, class: UI.etape > i + 1 ? "fait" : null, text: (i + 1) + " · " + n })); });
+    w.appendChild(h("header", { class: "entete pad" }, h("span", { class: "titre-f", text: R.titre }), ol));
+    var m = h("main", { class: "creation pad" });
+    w.appendChild(m);
+    var suivant = h("button", { class: "b-prim", onclick: function () { if (UI.etape < 4) { UI.etape++; render(); window.scrollTo(0, 0); } else commencer(); } }, UI.etape < 4 ? "Continuer" : (R.boutonDepart || "Commencer l'aventure"));
+    var retour = h("button", { class: "b-lien", onclick: function () { if (UI.etape > 1) { UI.etape--; render(); } else { UI.ecran = "titre"; render(); } } }, "← Retour");
+
+    if (UI.etape === 1) {
+      m.appendChild(h("div", null, h("h2", { class: "titre-f", text: "Qui es-tu ?" }), h("p", { class: "sous", text: "Avant de fuir, tu avais un nom, une terre, un passé. Ils te suivront jusque sous terre." })));
+      m.appendChild(h("label", { class: "champ", style: "display:flex;flex-direction:column;gap:8px" }, h("span", { class: "label", text: "Ton nom" }),
+        h("input", { type: "text", id: "nom", value: st.nom, placeholder: R.nomDefaut || "Voyageur", maxlength: 30, "data-focus": true, oninput: function (e) { st.nom = e.target.value; } })));
+      var g = h("div", { class: "seg", role: "group", "aria-label": "Genre" });
+      [["m", "un aventurier"], ["f", "une aventurière"]].concat(R.neutre !== false ? [["n", "un·e aventurier·e (iel)"]] : []).forEach(function (o) {
+        g.appendChild(h("button", { "aria-pressed": st.genre === o[0] ? "true" : "false", onclick: function () { st.genre = o[0]; render(); } }, o[1]));
+      });
+      m.appendChild(h("div", { style: "display:flex;flex-direction:column;gap:10px" }, h("p", { class: "label", text: "Tu es" }), g));
+      var c = h("div", { class: "cartes" });
+      (R.origines || []).forEach(function (o) {
+        c.appendChild(h("button", { class: "carte", "aria-pressed": st.origine === o.nom ? "true" : "false", onclick: function () { st.origine = o.nom; render(); } },
+          h("span", { class: "nom", text: genre(o.nom) }), o.desc ? h("span", { class: "desc", text: genre(o.desc) }) : null, o.effet ? h("span", { class: "jeu", text: "En jeu : " + genre(o.effet) }) : null));
+      });
+      m.appendChild(h("div", { style: "display:flex;flex-direction:column;gap:10px" }, h("p", { class: "label", text: "Tu viens de" }), c));
+    } else if (UI.etape === 2) {
+      m.appendChild(h("h2", { class: "titre-f", text: "Que faisais-tu ?" }));
+      var c2 = h("div", { class: "cartes" });
+      (R.occupations || []).forEach(function (o) {
+        c2.appendChild(h("button", { class: "carte", "aria-pressed": st.occupation === o.nom ? "true" : "false", onclick: function () { st.occupation = o.nom; render(); } },
+          h("span", { class: "nom", text: genre(o.nom) }), h("span", { class: "desc", text: (o.fav || []).map(function (k) { return k === "cp" ? "Port" : STATS[k]; }).join(", ") })));
+      });
+      m.appendChild(c2);
+      var o = occOf(st.occupation);
+      m.appendChild(h("article", { class: "detail" }, h("h3", { class: "titre-f", text: genre(o.nom || "") }),
+        o.desc ? h("p", { text: genre(o.desc) }) : null,
+        h("div", { class: "infos", html: "<span>Favorise <b>" + esc((o.fav || []).map(function (k) { return k === "cp" ? "la Capacité de port" : (k === "for" || k === "vig" ? "la " : "l'") + STATS[k]; }).join("</b> et <b>")) + "</b></span><span>Arme : <b>" + esc((o.arme || "").toLowerCase()) + "</b>, " + esc(o.degats || "") + "</span>" + (o.armure ? "<span>Armure " + o.armure + "</span>" : "") + (o.parade ? "<span>Parade +" + o.parade + "</span>" : "") })));
+    } else if (UI.etape === 3) {
+      if (!st.rolled) st.rolled = { for: roll([3, 6, 1]), hab: roll([3, 6, 1]), sag: roll([3, 6, 1]) };
+      var tmp = nouveauPerso(st), fav = occOf(st.occupation).fav || [];
+      m.appendChild(h("div", { style: "display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px" }, h("h2", { class: "titre-f", text: "Ton corps et ton esprit" }),
+        h("button", { class: "b-sec", disabled: st.relances > 0 ? null : "disabled", onclick: function () { st.relances--; st.rolled = null; render(); } }, "Relancer les dés · " + st.relances + " restante" + (st.relances > 1 ? "s" : ""))));
+      var g3 = h("div", { class: "carac" });
+      ["for", "hab", "sag"].forEach(function (k) {
+        var plus = fav.indexOf(k) >= 0;
+        g3.appendChild(h("div", null, h("b", { text: STATS[k] }), h("span", { class: "val", html: tmp.s[k] + (plus ? " <small>dés " + st.rolled[k] + " · +2</small>" : "") }), h("span", { class: "expl", text: EXPL[k] })));
+      });
+      m.appendChild(g3);
+      m.appendChild(h("div", { class: "derives", html: "<div><b>" + tmp.s.vigMax + "</b><span>Vigueur</span></div><div><b class='mag'>" + tmp.s.manMax + "</b><span>Mana</span></div><div><b>" + tmp.s.cha + "</b><span>Chance</span></div>" }));
+      m.appendChild(h("p", { class: "sous", style: "font-style:normal;font-family:var(--police-ui);font-size:15px;color:var(--texte-doux)", text: "Chaque test se joue au d20 : il faut faire moins que ta caractéristique ou autant. La Vigueur, ce sont tes forces : à zéro, tu meurs. Le Mana alimente les Mots de pouvoir." + (tmp.s.cha <= 5 ? " Ta Chance est faible : t'y fier sera toujours un pari." : "") }));
+    } else {
+      var tmp4 = nouveauPerso(st), oc = occOf(st.occupation), org = origOf(st.origine), cr = (R.crimes || {})[st.occupation];
+      var grid = h("div", { class: "crime" });
+      var left = h("section", { style: "display:flex;flex-direction:column;gap:20px" });
+      if (cr && (cr.titre || cr.texte)) {
+        left.appendChild(h("p", { class: "avis", text: "Avis de recherche · " + nomHeros2(st) + (st.origine ? ", " + genre(st.origine) : "") }));
+        left.appendChild(h("h2", { class: "titre-f", style: "line-height:1.1", text: genre(cr.titre || "", st.genre) }));
+        if (cr.texte) left.appendChild(h("div", { class: "recit", html: riche(cr.texte, st.genre) }));
+        if (org.aggravation) left.appendChild(h("div", { class: "recit", html: riche(org.aggravation, st.genre) }));
+        if (cr.peine) left.appendChild(h("div", { style: "padding-top:10px;border-top:1px solid var(--trait-doux)" }, h("span", { class: "label", text: "Peine encourue" }), h("div", { class: "ko", style: "font-size:19px;font-weight:700", text: cr.peine })));
+      } else {
+        left.appendChild(h("h2", { class: "titre-f", text: "Te voilà prêt·e" .replace("·e", st.genre === "f" ? "e" : st.genre === "n" ? "·e" : "") }));
+        left.appendChild(h("p", { class: "sous", text: "Ton histoire commence maintenant." }));
+      }
+      grid.appendChild(left);
+      var ff = h("aside", { class: "fiche-mini", "aria-label": "Ta fiche" }, h("h3", { class: "titre-f", text: nomHeros2(st) }),
+        h("p", { style: "margin:0;color:#b8af9f;font-size:15px", text: [{ m: "Un aventurier", f: "Une aventurière", n: "Un·e aventurier·e" }[st.genre], genre(st.origine), genre(st.occupation)].filter(Boolean).join(" · ") }),
+        h("div", { class: "grille6", html: ["for", "hab", "sag"].map(function (k) { return "<div><b>" + tmp4.s[k] + "</b><span>" + STATS[k] + "</span></div>"; }).join("") +
+          "<div><b>" + tmp4.s.vigMax + "</b><span>Vigueur</span></div><div><b class='mag'>" + tmp4.s.manMax + "</b><span>Mana</span></div><div><b>" + tmp4.s.cha + "</b><span>Chance</span></div>" }),
+        h("p", { style: "margin:0;font-size:15px", html: "<span style='color:var(--texte-doux)'>Arme :</span> " + esc((oc.arme || "").toLowerCase()) + " (" + esc(oc.degats || "") + ")" }));
+      grid.appendChild(ff);
+      m.appendChild(grid);
+    }
+    w.appendChild(h("footer", { class: "navcrea pad" }, retour, suivant));
+    return w;
+  }
+  function nomHeros2(st) { return String(st.nom || "").trim() || R.nomDefaut || "Voyageur"; }
+  function commencer() {
+    if (!L.passages[R.depart]) { alertLivre("Ce livre n'a pas de passage de départ."); return; }
+    P = nouveauPerso(clone(UI.setup));
+    UI.modal = null;
+    entrer(R.depart);
+  }
+  function alertLivre(t) { app.innerHTML = ""; app.appendChild(h("main", { class: "ecran-mort pad" }, h("p", { text: t }))); }
+
+  /* ---------- Jeu ---------- */
+  function barre() {
+    var p = L.passages[P.cur] || {}, s = P.s, vm = eff("vigMax"), mm = eff("manMax");
+    return h("header", { class: "barre pad" },
+      h("span", { class: "titre-f", text: R.titre }),
+      h("span", { class: "acte", text: nomActe(p.acte) }),
+      h("div", { class: "stats" },
+        h("span", { class: "jauge", title: "Vigueur" }, h("span", { class: "t", text: "Vigueur" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / Math.max(1, vm)) + "%" })), h("b", { text: s.vig + " / " + vm })),
+        h("span", { class: "jauge mana", title: "Mana" }, h("span", { class: "t", text: "Mana" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.man / Math.max(1, mm)) + "%" })), h("b", { text: String(s.man) })),
+        h("span", { class: "usure" }, h("span", { class: "t", style: "color:var(--texte-doux)", text: "Usure " }), h("b", { text: String(P.usure) })),
+        h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.modal = "fiche"; render(); } }, "Fiche"),
+        h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.modal = "menu"; render(); } }, "Menu")));
+  }
+  function ecranJeu() {
+    var w = h("div", { class: "wrap" }), p = L.passages[P.cur];
+    w.appendChild(barre());
+    var a = h("main", { class: "lecture pad" });
+    w.appendChild(a);
+    if (p.imageData) a.appendChild(h("img", { class: "illus", src: p.imageData, alt: "" }));
+    a.appendChild(h("div", { class: "numero", "aria-label": "Passage " + p.num }, h("span"), h("b", { text: p.num }), h("span")));
+    var fx = (P.fx || []).filter(Boolean);
+    if (fx.length) a.appendChild(h("p", { class: "gains", text: fx.join(" · ") }));
+    var r = h("div", { class: "recit", tabindex: "-1", "data-focus": true });
+    (p.segments || []).forEach(function (sg, i) { if (i === 0 || tousOk(sg.cond)) r.insertAdjacentHTML("beforeend", riche(sg.texte)); });
+    a.appendChild(r);
+    var is = p.issue || {};
+    if (is.type === "choix") {
+      var nav = h("nav", { class: "choix", "aria-label": "Choix" }), n = 0;
+      (is.choix || []).forEach(function (c) {
+        var ok = tousOk(c.cond);
+        if (!ok && (c.affichage || "cache") === "cache") return;
+        n++;
+        if (ok && c.cible) nav.appendChild(h("button", { onclick: function () { aller(c.cible, c.effets); } }, genre(c.texte || "…")));
+        else nav.appendChild(h("div", { class: "bloque" }, h("s", { text: genre(c.texte || "…") }), c.raison ? h("em", { text: genre(c.raison) }) : null));
+      });
+      if (!n) nav.appendChild(h("p", { class: "vide", text: "Aucun chemin ne s'ouvre à toi ici." }));
+      a.appendChild(nav);
+    } else if (is.type === "test") {
+      var val = eff(is.stat || "hab") + (+is.modif || 0), t = P.test;
+      var box = h("section", { class: "test", "aria-label": "Test de " + STATS[is.stat] });
+      var couleur = !t ? "var(--trait)" : t.ok ? "var(--mousse)" : "var(--sang-clair)";
+      box.appendChild(h("div", { class: "de" + (t && t.neuf ? " roule" : ""), html: '<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,4 92,28 92,72 50,96 8,72 8,28" fill="var(--surface-2)" stroke="' + couleur + '" stroke-width="2.5"/><polygon points="50,22 76,66 24,66" fill="none" stroke="var(--trait)" stroke-width="1.5"/></svg><b style="color:' + couleur + '">' + (t ? t.r : "?") + "</b>" }));
+      var res = h("div", { class: "res" }, h("span", { class: "label", text: "Test de " + STATS[is.stat] }),
+        h("span", { style: "font-size:17px;color:#b8af9f", html: "Il te faut <b style='color:var(--texte)'>" + val + " ou moins</b> au d20." }));
+      if (t) res.appendChild(h("span", { class: "verdict " + (t.ok ? "ok" : "ko"), text: t.ok ? "Réussite" : "Échec" }));
+      box.appendChild(res);
+      a.appendChild(box);
+      if (!t) a.appendChild(h("div", null, h("button", { class: "b-prim", onclick: function () { var r = rnd(20); P.test = { r: r, ok: r <= val, neuf: true }; sauver(); render(); P.test.neuf = false; } }, "Lancer le d20")));
+      else a.appendChild(h("nav", { class: "choix" }, h("button", { "data-focus": true, onclick: function () { aller(t.ok ? is.succes : is.echec); } }, "Continuer")));
+    } else if (is.type === "combat") {
+      if (P.combat && P.combat.manque) a.appendChild(h("p", { class: "vide", text: "(Combat sans ennemi : passage à compléter dans l'atelier.)" }));
+    }
+    return w;
+  }
+  function fenetreCombat() {
+    var c = P.combat, e = ennemi(c.eid), w = arme(), s = P.s, aides = !!e.tutoriel, t = seuils(c, e, w, aides), is = L.passages[P.cur].issue || {};
+    var corps = h("div", { class: "corps combat" });
+    var gauche = h("div");
+    gauche.appendChild(h("div", { class: "duel" },
+      h("div", null, h("div", { class: "n" }, h("b", { text: e.nom || "Ennemi" })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * c.vig / c.max) + "%" })), h("small", { text: "Vigueur " + c.vig + " / " + c.max })),
+      h("div", null, h("div", { class: "n" }, h("span", { style: "font-weight:700;font-size:18px", text: nomHeros() }), h("small", { text: w.nom.toLowerCase() + " · armure " + w.armure })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / Math.max(1, eff("vigMax"))) + "%" })), h("small", { text: "Vigueur " + s.vig + " / " + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }))));
+    if (c.fini === "victoire") {
+      gauche.appendChild(h("div", { class: "victoire" }, h("p", { class: "ok", text: e.mort ? genre(e.mort) : "Ton adversaire s'effondre." }),
+        h("div", null, h("button", { class: "b-prim", "data-focus": true, onclick: function () { P.combat = null; aller(is.victoire); } }, "Continuer"))));
+    } else {
+      gauche.appendChild(h("div", { class: "intention" }, h("span", { class: "label", text: "Tour " + c.tour + (c.vu ? "" : " · il prépare quelque chose") }), h("p", { text: genre(c.vu ? c.dit : c.voile) }),
+        aides ? h("div", { class: "aide", text: INTENTS[c.it] + " · " + { lourd: "lent et puissant : esquive, puis contre-attaque.", rapides: "une série de coups secs : pare-les.", garde: "il est vulnérable : frappe !", incant: "frappe pour interrompre le sort." }[c.it] }) : null));
+      var acts = h("div", { class: "actions" });
+      function b(a, l, sub, cls, dis) { acts.appendChild(h("button", { class: cls || null, disabled: dis ? "disabled" : null, onclick: function () { agir(a); } }, h("b", { text: l }), h("small", { text: sub }))); }
+      function tv(v) { return v === null ? "impossible" : v + " ou moins"; }
+      b("frapper", "Frapper", STATS[w.atk] + " · " + tv(t.frapper));
+      b("esquiver", "Esquiver", "Habileté · " + tv(t.esquiver));
+      b("parer", "Parer", "Force · " + tv(t.parer));
+      b("prudente", "Garde prudente", "moitié des dégâts");
+      if (e.voile) b("observer", "Observer", c.observe ? "déjà tenté ce tour" : "Sagesse · " + eff("sag") + " ou moins", "obs", c.observe);
+      P.mots.forEach(function (mid) { var m = L.mots[mid]; if (!m || m.effet === "recit") return; var manque = Math.max(0, (+m.cout || 0) - s.man); b("mot:" + mid, m.nom, (m.cout || 0) + " Mana" + (manque ? " · " + manque + " en Usure" : ""), "mot"); });
+      Object.keys(P.inv).forEach(function (oid) { var o = L.objets[oid]; if (!o || !o.effet_stat) return; b("obj:" + oid, o.nom, (o.effet_val > 0 ? "+" : "") + (o.effet_val || 0) + " " + (STATS[o.effet_stat] || o.effet_stat) + " · " + P.inv[oid] + " restant" + (P.inv[oid] > 1 ? "s" : "")); });
+      gauche.appendChild(acts);
+    }
+    corps.appendChild(gauche);
+    var j = h("aside", { class: "journal", "aria-label": "Journal du combat" }, h("p", { class: "label", text: "Journal" }));
+    var ol = h("ol", { "aria-live": "polite" });
+    c.journal.forEach(function (x) { ol.appendChild(h("li", { html: x })); });
+    if (!c.journal.length) ol.appendChild(h("li", { text: "Le combat commence." }));
+    j.appendChild(ol);
+    corps.appendChild(j);
+    return h("div", { class: "voile" }, h("section", { class: "fenetre", role: "dialog", "aria-modal": "true", "aria-label": "Combat" },
+      h("header", null, h("h2", { class: "titre-f", text: "Combat" }), h("span", { class: "ko", style: "font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase", text: "Pas de fuite" })), corps));
+  }
+
+  /* ---------- Fenêtres ---------- */
+  function fermer() { UI.modal = null; render(); }
+  function fenetre(titre, contenu, large) {
+    var v = h("div", { class: "voile", onclick: function (e) { if (e.target === v) fermer(); } },
+      h("section", { class: "fenetre", role: "dialog", "aria-modal": "true", "aria-label": titre, style: large ? null : "max-width:640px" },
+        h("header", null, h("h2", { class: "titre-f", text: titre }), h("button", { class: "b-sec", "data-focus": true, onclick: fermer }, "Fermer")), contenu));
+    return v;
+  }
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && UI.modal) fermer(); });
+  function modalFiche() {
+    var s = P.s, f = h("div", { class: "corps fiche" });
+    f.appendChild(h("section", null, h("p", { class: "label", text: "Caractéristiques" }),
+      h("div", { html: "<div class='ligne'><span>Vigueur</span><b>" + s.vig + " / " + eff("vigMax") + "</b></div><div class='ligne' style='margin-top:6px'><span>Mana</span><b class='mag'>" + s.man + " / " + eff("manMax") + "</b></div>" }),
+      h("div", { class: "grille6", style: "grid-template-columns:repeat(2,minmax(0,1fr))", html: ["for", "hab", "sag", "cha"].map(function (k) { var bo = bonus(k); return "<div><b>" + eff(k) + (bo ? " <small class='mag' style='font-size:12px;font-weight:400'>" + (bo > 0 ? "+" : "") + bo + "</small>" : "") + "</b><span>" + STATS[k] + "</span></div>"; }).join("") }),
+      h("div", { class: "usure-boite" }, h("div", { style: "display:flex;justify-content:space-between" }, h("span", { class: "titre-f", style: "color:var(--or);font-size:20px", text: "Usure" }), h("b", { style: "color:var(--or);font-size:22px", text: String(P.usure) })),
+        h("p", { text: "Les années que la magie t'a prises. Elle ne redescend jamais." }))));
+    var eq = h("section", null, h("p", { class: "label", text: "Équipement et sac" }));
+    var w = arme(); eq.appendChild(h("div", { class: "ligne" }, h("span", null, h("b", { text: w.nom }), h("small", { text: "arme · " + w.txt + " · " + STATS[w.atk] })), h("span", { class: "pastille", text: "en main" })));
+    var ids = Object.keys(P.inv);
+    if (!ids.length) eq.appendChild(h("p", { class: "vide", text: "Ton sac est vide." }));
+    ids.forEach(function (id) {
+      var o = L.objets[id] || { nom: "?" }, sl = slotOf(o), on = sl && P.eq[sl] === id;
+      var desc = [o.categorie && o.categorie !== "divers" ? o.categorie : "", o.arme_degats || "", o.bonus_armure ? "armure +" + o.bonus_armure : "", o.bonus_stat ? (STATS[o.bonus_stat] || o.bonus_stat) + " +" + o.bonus_val : "", o.desc || ""].filter(Boolean).join(" · ");
+      var act = null;
+      if (sl) act = h("button", { class: "pastille", onclick: function () { if (on) delete P.eq[sl]; else P.eq[sl] = id; P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax")); sauver(); render(); } }, on ? "équipé" : "équiper");
+      else if (o.effet_stat) act = h("button", { class: "b-sec", style: "padding:5px 12px;font-size:14px", onclick: function () { appliquer([{ type: o.effet_stat === "usure" ? "usure" : "stat", stat: o.effet_stat, n: +o.effet_val || 0 }]); if (o.consommable) appliquer([{ type: "retirer", val: id, n: 1 }]); sauver(); render(); } }, "Utiliser");
+      eq.appendChild(h("div", { class: "ligne" }, h("span", null, h("b", { text: o.nom + (P.inv[id] > 1 ? " ×" + P.inv[id] : "") }), desc ? h("small", { text: desc }) : null), act));
+    });
+    f.appendChild(eq);
+    var sv = h("section", null, h("p", { class: "label", text: "Mots de pouvoir" }));
+    if (!P.mots.length) sv.appendChild(h("p", { class: "vide", text: "Aucun, pour l'instant." }));
+    P.mots.forEach(function (mid) { var m = L.mots[mid] || {}; sv.appendChild(h("div", { class: "mot-carte" }, h("div", { style: "display:flex;justify-content:space-between;align-items:baseline" }, h("span", { class: "titre-f", style: "color:var(--thanergie);font-size:20px", text: m.nom }), h("span", { style: "font-size:13.5px;color:var(--texte-doux)", text: (m.cout || 0) + " Mana" })), m.desc ? h("p", { text: m.desc }) : null)); });
+    sv.appendChild(h("p", { class: "label", style: "margin-top:8px", text: "Ce que tu sais" }));
+    var ul = h("ul", { class: "savoirs" });
+    P.infos.forEach(function (iid) { var x = L.infos[iid] || {}; ul.appendChild(h("li", { html: "<b style='color:var(--texte)'>" + esc(x.nom) + ".</b> " + esc(x.desc || "") })); });
+    if (!P.infos.length) ul.appendChild(h("li", { class: "vide", text: "Rien de particulier, pour l'instant." }));
+    sv.appendChild(ul);
+    f.appendChild(sv);
+    return fenetre(nomHeros(), f, true);
+  }
+  function modalRegles() {
+    return fenetre("Règles du jeu", h("div", { class: "corps recit", style: "font-size:17px", html:
+      "<p><b>Lire et choisir.</b> Chaque passage se termine par des choix, un test, un combat ou une fin. Certains choix n'apparaissent qu'à certains personnages.</p>" +
+      "<p><b>Les tests.</b> On lance un d20 : il faut faire moins que la caractéristique testée, ou autant.</p>" +
+      "<p><b>Les combats.</b> À chaque tour, l'ennemi annonce ce qu'il prépare. Un coup lourd s'esquive, et l'esquive ouvre une contre-attaque. Des coups rapides se parent. Une garde basse appelle une frappe. Certains ennemis cachent leurs gestes : la Sagesse permet de les lire. La garde prudente divise les dégâts par deux, sans jamais contre-attaquer. On ne fuit pas un combat engagé.</p>" +
+      "<p><b>La magie.</b> Les Mots de pouvoir coûtent du Mana. Si le Mana manque, la magie se paie en Usure : des années de vie, perdues pour de bon.</p>" +
+      "<p><b>La mort.</b> Si ta Vigueur tombe à zéro, tu meurs. Tu peux reprendre au début de l'acte en cours, avec ce que tu avais en y arrivant.</p>" +
+      "<p><b>Ta progression</b> est enregistrée automatiquement dans ce navigateur.</p>" }));
+  }
+  function modalFins() {
+    var vues = load(":fins") || [], toutes = toutesFins(), ul = h("ul", { class: "fins corps" });
+    toutes.forEach(function (pid) { var p = L.passages[pid], is = p.issue || {}, vu = vues.indexOf(pid) >= 0; ul.appendChild(h("li", { class: vu ? null : "cachee", text: vu ? (is.titreFin || is.fin) + " · " + (is.fin || "") : "? ? ?" })); });
+    if (!toutes.length) ul.appendChild(h("li", { class: "cachee", text: "Aucune fin dans cette démo." }));
+    return fenetre("Fins découvertes · " + vues.filter(function (x) { return L.passages[x]; }).length + " / " + toutes.length, ul);
+  }
+  function modalMenu() {
+    var taille = load(":taille") || 20;
+    function setTaille(t) { taille = Math.max(16, Math.min(26, t)); store(":taille", taille); document.documentElement.style.setProperty("--taille-recit", taille + "px"); render(); }
+    return fenetre("Menu", h("div", { class: "corps", style: "display:flex;flex-direction:column;gap:12px" },
+      h("div", { style: "display:flex;align-items:center;gap:10px" }, h("span", { text: "Taille du texte" }),
+        h("button", { class: "b-sec", "aria-label": "Réduire le texte", onclick: function () { setTaille(taille - 1); } }, "A−"), h("b", { text: taille + " px" }),
+        h("button", { class: "b-sec", "aria-label": "Agrandir le texte", onclick: function () { setTaille(taille + 1); } }, "A+")),
+      h("button", { class: "b-sec", onclick: function () { UI.modal = "regles"; render(); } }, "Règles du jeu"),
+      h("button", { class: "b-sec", onclick: function () { UI.modal = null; UI.ecran = "titre"; render(); } }, "Retour à la page de titre (la partie est sauvegardée)")));
+  }
+
+  /* ---------- Mort, fin, fin de démo ---------- */
+  function ecranMort() {
+    var p = L.passages[P.cur] || {}, c = P.combat, e = c && ennemi(c.eid);
+    var s = h("main", { class: "ecran-mort pad" });
+    s.appendChild(h("h1", { class: "titre-f", text: "Tu tombes" }));
+    s.appendChild(h("p", { style: "margin:0;font-size:15px;color:#8a8090", text: ["Passage " + p.num, e ? e.nom + (c.tour ? ", au " + c.tour + "e tour" : "") : "", "Usure " + P.usure].filter(Boolean).join(" · ") }));
+    var nav = h("div", { class: "menu" });
+    if (P.save) nav.appendChild(h("button", { class: "b-prim", "data-focus": true, style: "flex-direction:column;gap:3px", onclick: reprendreActe }, h("span", { text: "Reprendre au début de l'acte" + (P.save.cur && L.passages[P.save.cur] && ACTES[+L.passages[P.save.cur].acte] ? " " + ACTES[+L.passages[P.save.cur].acte] : "") }), h("small", { style: "font-weight:400;font-size:13.5px;color:#4a4035", text: "Tu y reviens avec ce que tu avais en y arrivant." })));
+    nav.appendChild(h("button", { class: "b-sec", "data-focus": P.save ? null : true, onclick: function () { UI.setup = null; UI.etape = 1; UI.ecran = "creation"; render(); } }, "Nouveau personnage"));
+    nav.appendChild(h("button", { class: "b-lien", onclick: function () { UI.ecran = "titre"; render(); } }, "Menu principal"));
+    s.appendChild(nav);
+    return s;
+  }
+  function ecranFin() {
+    var p = L.passages[P.cur], is = p.issue || {}, vues = load(":fins") || [], toutes = toutesFins();
+    var bon = is.fin === "Mort" || is.fin === "Échec" ? "ko" : "ok";
+    var w = h("main", { class: "ecran-fin pad" });
+    var g = h("section", { style: "display:flex;flex-direction:column;gap:20px" },
+      h("p", { class: "label " + bon, style: "letter-spacing:.28em", text: is.fin || "Fin" }),
+      h("h1", { class: "titre-f", text: genre(is.titreFin || is.fin || "Fin") }),
+      (function () { var o = ornement(); o.style.justifyContent = "flex-start"; return o; })(),
+      h("div", { class: "recit", tabindex: "-1", "data-focus": true, html: (p.segments || []).map(function (sg, i) { return i === 0 || tousOk(sg.cond) ? riche(sg.texte) : ""; }).join("") }),
+      h("div", { style: "display:flex;flex-wrap:wrap;gap:10px;margin-top:8px" },
+        h("button", { class: "b-prim", onclick: function () { UI.setup = null; UI.etape = 1; UI.ecran = "creation"; render(); } }, "Rejouer avec un autre personnage"),
+        h("button", { class: "b-sec", onclick: function () { UI.ecran = "titre"; render(); } }, "Menu principal")));
+    w.appendChild(g);
+    var ul = h("ul", { class: "fins" });
+    toutes.forEach(function (pid) { var q = L.passages[pid], qi = q.issue || {}, vu = vues.indexOf(pid) >= 0; ul.appendChild(h("li", { class: pid === P.cur ? "actuelle" : vu ? null : "cachee", text: vu ? genre(qi.titreFin || qi.fin) : "? ? ?" })); });
+    w.appendChild(h("aside", { class: "panneau" },
+      h("div", { style: "display:flex;justify-content:space-between;align-items:baseline" }, h("h2", { class: "titre-f", style: "margin:0;font-size:24px", text: "Fins découvertes" }), h("b", { style: "font-size:18px", text: vues.filter(function (x) { return L.passages[x]; }).length + " / " + toutes.length })),
+      ul,
+      h("div", { class: "bilan", html: "<div><b>" + P.lus + "</b><span>passages lus</span></div><div><b>" + P.mots.length + "</b><span>Mots trouvés</span></div><div><b>" + P.morts + "</b><span>morts en chemin</span></div><div><b style='color:var(--or)'>" + P.usure + "</b><span>Usure finale</span></div>" })));
+    return w;
+  }
+  function ecranDemoFin() {
+    var s = h("main", { class: "ecran-titre pad" },
+      h("p", { class: "label", text: "Fin de la démo" }),
+      h("h1", { class: "titre-f", style: "font-size:clamp(36px,6vw,60px)", text: "La suite reste à écrire" }),
+      ornement(),
+      h("p", { class: "accroche", text: R.finDemo || "Merci d'avoir joué ! Ton avis compte : dis à l'auteur ce qui t'a plu, ce qui t'a perdu, et ce que tu aurais voulu faire." }),
+      h("div", { class: "menu" },
+        h("button", { class: "b-prim", "data-focus": true, onclick: function () { UI.setup = null; UI.etape = 1; UI.ecran = "creation"; render(); } }, "Rejouer avec un autre personnage"),
+        h("button", { class: "b-sec", onclick: function () { UI.ecran = "titre"; render(); } }, "Menu principal")));
+    return s;
+  }
+
+  /* ---------- Démarrage ---------- */
+  var t0 = load(":taille"); if (t0) document.documentElement.style.setProperty("--taille-recit", t0 + "px");
+  document.title = R.titre || document.title;
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2080 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Atelier de Képultum</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Alegreya:ital,wght@0,400;0,600;1,400&family=IM+Fell+English+SC&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
+<style>
+/* Layout : outil de travail plein écran. Barre d'onglets en haut ; vue Passages en trois colonnes (liste · formulaire · aperçu) ; vue Graphe sur toute la largeur.
+   Identité : la pierre de l'abbaye et le vert-de-gris de la thanergie en clair ; la crypte et l'ivoire du palais en sombre. */
+:root {
+  --bg: #e4e5e8;
+  --bg-glow: #f1f1ef;
+  --panel: #fbfbf9;
+  --panel-2: #f1f2f2;
+  --line: #cdd0d6;
+  --fg: #1e1c23;
+  --muted: #5b5f6c;
+  --accent: #33665f;
+  --accent-ink: #fbfbf9;
+  --accent-soft: #dbe8e5;
+  --ivory: #8a6a28;
+  --good: #2f7448;
+  --warn: #946507;
+  --bad: #a63a2b;
+  --thane: #33665f;
+  --ui: 'Alegreya Sans', 'Segoe UI', system-ui, sans-serif;
+  --story: 'Alegreya', 'Iowan Old Style', Georgia, serif;
+  --display: 'IM Fell English SC', 'Iowan Old Style', Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131116; --bg-glow: #221c27; --panel: #1b1820; --panel-2: #231f29; --line: #383241; --fg: #e8e1d2; --muted: #9d9486;
+    --accent: #84c0b2; --accent-ink: #131116; --accent-soft: #1f3330; --ivory: #dccba4; --good: #93b376; --warn: #d9b55c; --bad: #e27461; --thane: #84c0b2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131116; --bg-glow: #221c27; --panel: #1b1820; --panel-2: #231f29; --line: #383241; --fg: #e8e1d2; --muted: #9d9486;
+  --accent: #84c0b2; --accent-ink: #131116; --accent-soft: #1f3330; --ivory: #dccba4; --good: #93b376; --warn: #d9b55c; --bad: #e27461; --thane: #84c0b2;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font-family: var(--ui); font-size: 15px; line-height: 1.45;
+  background-image: radial-gradient(ellipse 90% 380px at 50% 0%, var(--bg-glow) 0%, transparent 100%); background-repeat: no-repeat;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px 24px;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- En-tête ---------- */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 28px; margin-bottom: 14px; padding-top: 4px; }
+.brand { font-family: var(--display); font-size: 1.6rem; font-weight: 400; letter-spacing: .02em; color: var(--ivory); line-height: 1; }
+.brand small { font-family: var(--ui); font-size: .8rem; font-weight: 500; color: var(--muted); margin-left: 8px; letter-spacing: .06em; text-transform: uppercase; }
+nav.tabs { display: flex; flex-wrap: wrap; gap: 0 4px; border-bottom: 1px solid var(--line); }
+nav.tabs button { border: 0; background: transparent; padding: 7px 10px 6px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav.tabs button:hover { color: var(--fg); }
+nav.tabs button[aria-current="page"] { color: var(--fg); border-bottom-color: var(--ivory); }
+nav.tabs .count { font-size: .75rem; margin-left: 4px; opacity: .8; }
+.status { margin-left: auto; font-size: .8rem; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); display: inline-block; margin-right: 5px; }
+.status .dot.saving { background: var(--warn); }
+.status .dot.err { background: var(--bad); }
+.banner { background: var(--accent-soft); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: .85rem; }
+
+/* ---------- Mise en page ---------- */
+.cols { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(0, 430px); gap: 12px; align-items: start; }
+.cols.nopreview { grid-template-columns: 250px minmax(0, 1fr); }
+@media (max-width: 1250px) { .cols { grid-template-columns: 230px minmax(0, 1fr); } .cols .side-right { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .cols, .cols.nopreview { grid-template-columns: minmax(0, 1fr); } }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-width: 0; box-shadow: 0 1px 0 rgba(0,0,0,.03); }
+.box-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.box-h h2, .box-h h3 { margin: 0; font-family: var(--display); font-size: 1.2rem; font-weight: 400; letter-spacing: .01em; }
+.box-b { padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.sticky { position: sticky; top: 8px; max-height: calc(100vh - 24px); overflow: auto; }
+
+/* ---------- Liste des passages ---------- */
+.list-tools { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.plist { list-style: none; margin: 0; padding: 4px; display: flex; flex-direction: column; gap: 1px; }
+.plist li button { width: 100%; text-align: left; border: 0; background: transparent; border-radius: 6px; padding: 6px 8px; display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.plist li button:hover { background: var(--panel-2); }
+.plist li button[aria-current="true"] { background: var(--accent-soft); }
+.plist .num { font-family: var(--display); font-size: 1.05rem; font-variant-numeric: tabular-nums; color: var(--ivory); }
+.plist .ttl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plist .flag { font-size: .7rem; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.plist .flag.ecrit { color: var(--good); border-color: currentColor; }
+.plist .flag.relu { color: var(--accent); border-color: currentColor; }
+.plist .flag.fin { color: var(--ivory); border-color: currentColor; }
+.plist .flag.brouillon { color: var(--warn); border-color: currentColor; }
+.plist .grp { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 8px 8px 2px; }
+.empty { color: var(--muted); font-size: .88rem; padding: 12px; }
+
+/* ---------- Formulaires ---------- */
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: .78rem; font-weight: 600; color: var(--muted); min-width: 0; }
+label.f.inline { flex-direction: row; align-items: center; gap: 6px; font-weight: 500; color: var(--fg); font-size: .85rem; }
+input[type=text], input[type=number], input[type=search], select, textarea {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-width: 0; width: 100%;
+}
+input[type=number] { width: 5.5em; }
+textarea { resize: vertical; min-height: 60px; }
+textarea.story { font-family: var(--story); font-size: 1.08rem; line-height: 1.65; min-height: 170px; padding: 12px 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.row > .grow { flex: 1 1 160px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 8px; }
+.sec { display: flex; flex-direction: column; gap: 8px; }
+.sec-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sec-h h3 { margin: 0; font-family: var(--display); font-size: 1.02rem; letter-spacing: .03em; color: var(--ivory); font-weight: 400; }
+.hint { font-size: .78rem; color: var(--muted); }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--panel-2); }
+.card.cond { border-left: 3px solid var(--thane); }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 5px 10px; font-weight: 500; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); color: var(--accent-ink); }
+.btn.small { padding: 2px 8px; font-size: .8rem; }
+.btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+.btn.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; background: var(--panel); padding: 5px 12px; font-weight: 500; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.mini-rows { display: flex; flex-direction: column; gap: 6px; }
+.mini-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mini-row select, .mini-row input[type=text] { width: auto; flex: 1 1 120px; }
+.mini-row .x { border: 0; background: none; color: var(--muted); font-size: 1.1rem; line-height: 1; padding: 2px 6px; }
+.mini-row .x:hover { color: var(--bad); }
+.confirm { display: inline-flex; gap: 6px; align-items: center; font-size: .82rem; color: var(--bad); }
+.thumb { max-width: 100%; max-height: 220px; border-radius: 6px; border: 1px solid var(--line); object-fit: contain; align-self: flex-start; }
+.pill { display: inline-block; font-size: .72rem; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+
+/* ---------- Aperçu ---------- */
+.pv-setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr)); gap: 6px; }
+.pv-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pv-stats b { color: var(--fg); }
+.pv-inv { font-size: .8rem; color: var(--muted); }
+.pv-page { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.pv-num { text-align: center; font-family: var(--display); font-size: 1.7rem; color: var(--ivory); }
+.pv-num::before, .pv-num::after { content: "—"; color: var(--line); margin: 0 .4em; }
+.pv-text { font-family: var(--story); font-size: 1.05rem; line-height: 1.65; }
+.pv-text p { margin: 0 0 .7em; }
+.pv-text .condseg { border-left: 2px solid var(--thane); padding-left: 8px; }
+.pv-img { max-width: 100%; border-radius: 6px; }
+.pv-fx { font-size: .8rem; color: var(--thane); }
+.pv-choice { text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 7px 10px; font-family: var(--story); font-size: 1rem; }
+.pv-choice:hover:not(:disabled) { border-color: var(--accent); }
+.pv-choice:disabled { opacity: .55; cursor: not-allowed; text-decoration: line-through; }
+.pv-reason { font-size: .78rem; color: var(--muted); font-style: italic; margin: -4px 0 2px 10px; }
+.pv-end { text-align: center; padding: 8px; }
+.pv-end h4 { margin: 0 0 4px; font-family: var(--display); font-weight: 400; font-size: 1.4rem; color: var(--ivory); }
+.die { display: inline-flex; align-items: center; justify-content: center; min-width: 1.8em; height: 1.8em; padding: 0 4px; border: 1.5px solid currentColor; border-radius: 4px; font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 4px; }
+.ok { color: var(--good); font-weight: 600; }
+.ko { color: var(--bad); font-weight: 600; }
+.mag { color: var(--thane); }
+.cb-intent { font-family: var(--story); font-style: italic; font-size: 1.05rem; border-left: 3px solid var(--ivory); padding: 6px 10px; background: var(--panel); border-radius: 0 6px 6px 0; }
+.cb-acts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr)); gap: 5px; }
+.cb-acts button { text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 5px 8px; font-size: .82rem; }
+.cb-acts button:hover:not(:disabled) { border-color: var(--accent); }
+.cb-acts button:disabled { opacity: .45; }
+.cb-acts small { display: block; color: var(--muted); font-size: .72rem; }
+.cb-log { list-style: none; margin: 0; padding: 0; font-size: .8rem; color: var(--muted); display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
+.cb-log li:first-child { color: var(--fg); }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--bad); }
+
+/* ---------- Vérifications ---------- */
+.issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.issues li { display: grid; grid-template-columns: 6.5em 3.5em minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 6px; background: var(--panel-2); font-size: .85rem; }
+.lvl { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.lvl.erreur { color: var(--bad); }
+.lvl.attention { color: var(--warn); }
+.kpis { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: .85rem; color: var(--muted); }
+.kpis b { color: var(--fg); font-size: 1.1rem; font-variant-numeric: tabular-nums; margin-right: 4px; }
+
+/* ---------- Catalogues ---------- */
+.cat { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 760px) { .cat { grid-template-columns: minmax(0, 1fr); } }
+.tbl-wrap { overflow-x: auto; }
+table.mini { border-collapse: collapse; width: 100%; font-size: .85rem; }
+table.mini th, table.mini td { border-bottom: 1px solid var(--line); padding: 5px 6px; text-align: left; vertical-align: top; }
+table.mini th { font-size: .75rem; color: var(--muted); font-weight: 600; }
+table.mini input, table.mini select { width: 100%; }
+table.mini input[type=number] { width: 4.5em; }
+.graph-tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.graph-tools select { width: auto; }
+.graph-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .8rem; color: var(--muted); margin-left: auto; }
+.graph-legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 4px; }
+.graph-legend i.dash { border-top-style: dashed; }
+.graph-legend b.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid; vertical-align: -1px; margin-right: 4px; }
+.graph-svg { display: block; width: 100%; touch-action: none; cursor: grab; background: var(--panel-2); border-radius: 0 0 6px 6px; user-select: none; }
+.graph-svg.dragging { cursor: grabbing; }
+.graph-svg .gn { cursor: pointer; }
+.graph-svg .gn:hover rect.card-bg { stroke-width: 2.5; }
+.graph-svg text { font-family: var(--ui); }
+.graph-svg .gnum { font-family: var(--display); }
+.graph-hint { font-size: .8rem; color: var(--muted); padding: 6px 12px 10px; }
+.play-wrap { max-width: 780px; margin: 0 auto; }
+.cb-overlay { position: fixed; inset: 0; z-index: 50; background: rgba(8, 7, 10, .66); display: flex; align-items: center; justify-content: center; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+.cb-dialog { width: 100%; max-width: 820px; max-height: calc(100vh - 48px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px; box-shadow: 0 24px 70px rgba(0, 0, 0, .5); display: flex; flex-direction: column; gap: 10px; }
+.cb-title { margin: 0; font-family: var(--display); font-weight: 400; font-size: 1.5rem; color: var(--ivory); }
+.reader .pv-text { font-size: 1.15rem; }
+.reader .pv-page { padding: 20px 24px; }
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 6px; }
+.pick { text-align: left; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.pick span { font-size: .8rem; color: var(--muted); }
+.pick[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+details.help { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: .85rem; }
+details.help summary { cursor: pointer; font-weight: 600; }
+details.help code { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: .85em; }
+</style>
+
+<div class="top">
+  <div class="brand">Atelier de Képultum<small>écriture</small></div>
+  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+  <div class="status" id="status"><span><span class="dot" id="dot"></span><span id="statusText">Connexion…</span></span></div>
+</div>
+<div id="banner"></div>
+<main id="main"></main>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =====================================================================
+     Données et constantes
+     ===================================================================== */
+  var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance" };
+  var TEST_STATS = ["for", "hab", "sag", "cha"];
+  var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
+  var STATUTS = { afaire: "À écrire", brouillon: "Brouillon", ecrit: "Écrit", relu: "Relu" };
+  var FINS = ["Bonne fin", "Fin douce-amère", "Mauvaise fin", "Fin d'évasion", "Échec", "Mort"];
+  var COLS = ["passages", "objets", "mots", "infos", "ennemis"];
+
+  var D = { passages: {}, objets: {}, mots: {}, infos: {}, ennemis: {}, reglages: null };
+  var UI = { view: "passages", sel: null, q: "", acte: "tous", catSel: {}, preview: true, confirmDel: false };
+  var db = null, assets = null, downloads = null, offline = false, GH = null;
+  var loaded = { passages: false, objets: false, mots: false, infos: false, ennemis: false, reglages: false };
+
+  var DEFAULT_REGLAGES = {
+    titre: "Aventures en Képultum",
+    depart: "",
+    base: { for: 12, hab: 12, sag: 11 },
+    origines: [],
+    occupations: []
+  };
+
+  /* =====================================================================
+     Outils
+     ===================================================================== */
+  function h(tag, attrs) {
+    var el = document.createElement(tag);
+    if (attrs) for (var k in attrs) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) continue;
+      if (k === "class") el.className = v;
+      else if (k === "text") el.textContent = v;
+      else if (k === "html") el.innerHTML = v;
+      else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), v);
+      else if (k === "value") el.value = v;
+      else if (k === "checked") el.checked = !!v;
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+    for (var i = 2; i < arguments.length; i++) add(el, arguments[i]);
+    return el;
+  }
+  function add(el, c) {
+    if (c === null || c === undefined || c === false) return;
+    if (Array.isArray(c)) { c.forEach(function (x) { add(el, x); }); return; }
+    el.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(String(c)) : c);
+  }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function uid(p) { return (p || "x") + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+  function rnd(n) { return 1 + Math.floor(Math.random() * n); }
+  function parseDice(s) {
+    s = String(s || "").replace(/\s/g, "");
+    var m = s.match(/^(\d*)d(\d+)([+-]\d+)?$/i);
+    if (m) return [parseInt(m[1] || "1", 10), parseInt(m[2], 10), parseInt(m[3] || "0", 10)];
+    var n = parseInt(s, 10);
+    return [0, 0, isNaN(n) ? 0 : n];
+  }
+  function roll(spec) { var t = spec[2]; for (var i = 0; i < spec[0]; i++) t += rnd(spec[1]); return t; }
+  function lines(s) { return String(s || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean); }
+  function pick(a) { return a.length ? a[Math.floor(Math.random() * a.length)] : ""; }
+  function sortedPassages() {
+    return Object.keys(D.passages).map(function (id) { return D.passages[id]; }).sort(function (a, b) {
+      var na = parseFloat(a.num), nb = parseFloat(b.num);
+      if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+      if (!isNaN(na) && isNaN(nb)) return -1;
+      if (isNaN(na) && !isNaN(nb)) return 1;
+      return String(a.num || "").localeCompare(String(b.num || ""), "fr", { numeric: true });
+    });
+  }
+  function catList(col) {
+    return Object.keys(D[col]).map(function (id) { return D[col][id]; }).sort(function (a, b) { return String(a.nom || "").localeCompare(String(b.nom || ""), "fr"); });
+  }
+  function pLabel(id) { var p = D.passages[id]; return p ? (p.num || "?") + (p.titre ? " · " + p.titre : "") : "(passage supprimé)"; }
+  function R() { return D.reglages || DEFAULT_REGLAGES; }
+
+  /* Texte : genre, italique, paragraphes */
+  /* Genre : "m" masculin, "f" féminin, "n" neutre (iel).
+     {m|f|n} : trois formes ; avec deux formes seulement, le neutre reprend le masculin.
+     mot·e : le point médian ajoute la fin au féminin ; au neutre, la forme inclusive est gardée telle quelle. */
+  function heroName() {
+    var n = P && P.setup && String(P.setup.nom || "").trim();
+    return n || String(R().nomDefaut || "").trim() || "Voyageur";
+  }
+  function genre(text, g, nom) {
+    text = String(text || "").replace(/\{nom\}/gi, nom === undefined ? heroName() : nom);
+    text = text.replace(/\{([^{}]*\|[^{}]*)\}/g, function (_, inner) {
+      var parts = inner.split("|");
+      if (g === "f") return parts[1];
+      if (g === "n") return parts.length > 2 ? parts[2] : parts[0];
+      return parts[0];
+    });
+    if (g === "n") return text;
+    var f = g === "f";
+    text = text.replace(/([A-Za-zÀ-ÖØ-öø-ÿœŒæÆ'’-]+)·([A-Za-zÀ-ÖØ-öø-ÿœŒ]+)·([A-Za-zÀ-ÖØ-öø-ÿœŒ]+)/g, function (_, a, b, c) { return f ? a + b + c : a + c; });
+    text = text.replace(/([A-Za-zÀ-ÖØ-öø-ÿœŒæÆ'’-]+)·([A-Za-zÀ-ÖØ-öø-ÿœŒ]+)/g, function (_, a, b) { return f ? a + b : a; });
+    return text;
+  }
+  function neutreOn() { return R().neutre !== false; }
+  function genreOpts(long) {
+    var o = [["m", long ? "Masculin" : "masculin"], ["f", long ? "Féminin" : "féminin"]];
+    if (neutreOn()) o.push(["n", long ? "Neutre (iel)" : "neutre"]);
+    return o;
+  }
+  function missingNeutral(text) {
+    var n = 0;
+    String(text || "").replace(/\{([^{}]*\|[^{}]*)\}/g, function (_, inner) { if (inner.split("|").length === 2) n++; return _; });
+    return n;
+  }
+  function richText(text) {
+    return String(text || "").split(/\n\s*\n/).map(function (para) {
+      var s = esc(para.trim()).replace(/\*([^*]+)\*/g, "<em>$1</em>").replace(/\n/g, "<br>");
+      return s ? "<p>" + s + "</p>" : "";
+    }).join("");
+  }
+
+  /* =====================================================================
+     Persistance
+     ===================================================================== */
+  var timers = {}, pending = 0, lastErr = null;
+  function setStatus() {
+    var dot = document.getElementById("dot"), t = document.getElementById("statusText");
+    if (!dot) return;
+    var busy = pending || Object.keys(dirty).length || (GH && (GH.pending || GH.saving));
+    dot.className = "dot" + (lastErr ? " err" : busy ? " saving" : "");
+    t.textContent = lastErr ? lastErr : busy ? (GH ? "Enregistrement sur GitHub…" : "Enregistrement…") : offline ? "Mode local (non enregistré)" : GH ? (GH.ready ? "Enregistré sur GitHub" : "Non connecté") : "Tout est enregistré";
+  }
+  function writeDoc(path, data) {
+    if (GH) { GH.touch(path, false); return Promise.resolve(); }
+    if (offline) { try { localStorage.setItem("atelier:" + path, JSON.stringify(data)); } catch (e) {} return Promise.resolve(); }
+    pending++; setStatus();
+    return db.doc(path).set(data).then(function () { lastErr = null; }, function (e) {
+      lastErr = e && e.code === "quota_exceeded" ? "Base pleine : supprime des éléments" : "Échec de l'enregistrement (" + (e && e.code || "erreur") + ")";
+    }).then(function () { pending--; setStatus(); });
+  }
+  function deleteDoc(path) {
+    if (GH) { GH.touch(path, true); return Promise.resolve(); }
+    if (offline) { try { localStorage.removeItem("atelier:" + path); } catch (e) {} return Promise.resolve(); }
+    pending++; setStatus();
+    return db.doc(path).delete().then(function () {}, function () { lastErr = "Échec de la suppression"; }).then(function () { pending--; setStatus(); });
+  }
+  var dirty = {};
+  function saveLater(col, id) {
+    var key = col + "/" + id;
+    dirty[key] = true;
+    clearTimeout(timers[key]);
+    timers[key] = setTimeout(function () {
+      var obj = col === "reglages" ? D.reglages : D[col][id];
+      if (!obj) { delete dirty[key]; return; }
+      obj.maj = new Date().toISOString();
+      writeDoc(col === "reglages" ? "reglages/livre" : key, obj).then(function () { delete dirty[key]; });
+    }, 700);
+    setStatus();
+  }
+
+  function subscribe() {
+    COLS.forEach(function (col) {
+      var timer = setTimeout(function () { if (!loaded[col]) { lastErr = "La base ne répond pas encore"; setStatus(); } }, 10000);
+      db.collection(col).onSnapshot(function (snap) {
+        clearTimeout(timer);
+        var next = {};
+        snap.docs.forEach(function (d) {
+          var key = col + "/" + d.id;
+          if (dirty[key] && D[col][d.id]) next[d.id] = D[col][d.id];
+          else { var o = clone(d.data()); o.id = d.id; next[d.id] = o; }
+        });
+        Object.keys(dirty).forEach(function (k) { var p = k.split("/"); if (p[0] === col && D[col][p[1]] && !next[p[1]]) next[p[1]] = D[col][p[1]]; });
+        D[col] = next;
+        var first = !loaded[col];
+        loaded[col] = true;
+        if (!snap.metadata.fromCache && lastErr === "La base ne répond pas encore") lastErr = null;
+        setStatus();
+        onRemote(col, first);
+      }, function (e) { clearTimeout(timer); lastErr = "Connexion perdue à la base (" + e.code + ")"; setStatus(); });
+    });
+    db.doc("reglages/livre").onSnapshot(function (snap) {
+      if (!dirty["reglages/livre"]) D.reglages = snap.exists ? Object.assign(clone(DEFAULT_REGLAGES), clone(snap.data())) : null;
+      loaded.reglages = true;
+      onRemote("reglages", false);
+    }, function () {});
+  }
+  var remoteTimer = null;
+  function onRemote(col) {
+    clearTimeout(remoteTimer);
+    remoteTimer = setTimeout(function () {
+      renderTabs();
+      var ae = document.activeElement;
+      var typing = ae && (ae.tagName === "TEXTAREA" || ae.tagName === "INPUT" || ae.tagName === "SELECT") && document.getElementById("main").contains(ae);
+      if (!typing) render();
+      else refreshSidebars();
+    }, 60);
+  }
+  function loadOffline() {
+    offline = true;
+    COLS.forEach(function (col) { loaded[col] = true; });
+    loaded.reglages = true;
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.indexOf("atelier:") !== 0) continue;
+        var path = k.slice(8).split("/"), v = JSON.parse(localStorage.getItem(k));
+        if (path[0] === "reglages") D.reglages = Object.assign(clone(DEFAULT_REGLAGES), v);
+        else if (D[path[0]]) { v.id = path[1]; D[path[0]][path[1]] = v; }
+      }
+    } catch (e) {}
+  }
+
+  /* =====================================================================
+     Rendu général
+     ===================================================================== */
+  var VIEWS = [
+    ["passages", "Passages", function () { return Object.keys(D.passages).length; }],
+    ["graphe", "Graphe", null],
+    ["jouer", "Jouer", null],
+    ["ennemis", "Ennemis", function () { return Object.keys(D.ennemis).length; }],
+    ["objets", "Objets", function () { return Object.keys(D.objets).length; }],
+    ["mots", "Mots", function () { return Object.keys(D.mots).length; }],
+    ["infos", "Informations", function () { return Object.keys(D.infos).length; }],
+    ["verifs", "Vérifications", function () { return checks().filter(function (i) { return i.lvl === "erreur"; }).length || ""; }],
+    ["reglages", "Réglages", null],
+    ["aide", "Aide", null]
+  ];
+  function renderTabs() {
+    var nav = document.getElementById("tabs");
+    nav.innerHTML = "";
+    VIEWS.forEach(function (v) {
+      var c = v[2] ? v[2]() : "";
+      nav.appendChild(h("button", { "aria-current": UI.view === v[0] ? "page" : null, onclick: function () { UI.view = v[0]; UI.confirmDel = false; renderTabs(); render(); } },
+        v[1], c !== "" ? h("span", { class: "count", text: "(" + c + ")" }) : null));
+    });
+  }
+  function render() {
+    var main = document.getElementById("main");
+    var keepScroll = window.scrollY;
+    main.innerHTML = "";
+    if (GH && !GH.ready) { main.appendChild(lastErr && GH.cfg.token ? h("div", { class: "sec" }, h("p", { class: "empty", style: "color:var(--bad)", text: lastErr }), viewConnexion()) : GH.cfg.token ? h("p", { class: "empty", text: "Chargement de ton livre depuis GitHub…" }) : viewConnexion()); return; }
+    if (!loaded.passages) { main.appendChild(h("p", { class: "empty", text: "Chargement de ton livre…" })); return; }
+    var v = UI.view;
+    if (v === "passages") main.appendChild(viewPassages());
+    else if (v === "verifs") main.appendChild(viewChecks());
+    else if (v === "reglages") main.appendChild(viewReglages());
+    else if (v === "aide") main.appendChild(viewHelp());
+    else if (v === "jouer") main.appendChild(viewPlay());
+    else if (v === "graphe") { main.appendChild(viewGraph()); }
+    else main.appendChild(viewCatalog(v));
+    window.scrollTo(0, keepScroll);
+  }
+  function refreshSidebars() {
+    var l = document.getElementById("plistBox");
+    if (l) l.replaceWith(passageList());
+  }
+
+  /* =====================================================================
+     Vue Passages
+     ===================================================================== */
+  function viewPassages() {
+    var wrap = h("div", { class: "cols" + (UI.preview ? "" : " nopreview") });
+    wrap.appendChild(passageList());
+    var p = UI.sel && D.passages[UI.sel];
+    wrap.appendChild(p ? passageEditor(p) : h("section", { class: "box" }, h("div", { class: "empty" },
+      Object.keys(D.passages).length ? "Choisis un passage dans la liste, ou crée-en un nouveau." : "Ton livre est vide. Crée ton premier passage avec le bouton « Nouveau passage ».")));
+    if (UI.preview) wrap.appendChild(previewPanel());
+    return wrap;
+  }
+
+  function passageList() {
+    var box = h("aside", { class: "box sticky", id: "plistBox", "aria-label": "Liste des passages" });
+    var tools = h("div", { class: "list-tools" },
+      h("button", { class: "btn primary", onclick: function () { newPassage(); } }, "+ Nouveau passage"),
+      h("input", { type: "search", placeholder: "Chercher (numéro, titre, texte)", value: UI.q, id: "q", oninput: function (e) { UI.q = e.target.value; var nl = passageList(); document.getElementById("plistBox").replaceWith(nl); var q = document.getElementById("q"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }),
+      (function () {
+        var s = h("select", { id: "acteFilter", onchange: function (e) { UI.acte = e.target.value; refreshSidebars(); } });
+        [["tous", "Tous les actes"], ["1", "Acte I"], ["2", "Acte II"], ["3", "Acte III"], ["0", "Sans acte"]].forEach(function (o) { s.appendChild(h("option", { value: o[0], selected: UI.acte === o[0] ? "selected" : null }, o[1])); });
+        return s;
+      })()
+    );
+    box.appendChild(tools);
+    var ul = h("ul", { class: "plist" });
+    var q = UI.q.trim().toLowerCase();
+    var list = sortedPassages().filter(function (p) {
+      if (UI.acte !== "tous" && String(p.acte || "0") !== UI.acte) return false;
+      if (!q) return true;
+      var hay = [p.num, p.titre].concat((p.segments || []).map(function (s) { return s.texte; })).join(" ").toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+    var lastActe = null;
+    list.forEach(function (p) {
+      var a = String(p.acte || "0");
+      if (UI.acte === "tous" && a !== lastActe) { ul.appendChild(h("li", { class: "grp", text: a === "0" ? "Sans acte" : "Acte " + ["", "I", "II", "III"][+a] })); lastActe = a; }
+      var st = p.statut || "afaire";
+      ul.appendChild(h("li", null, h("button", { "aria-current": UI.sel === p.id ? "true" : null, onclick: function () { UI.sel = p.id; UI.confirmDel = false; render(); } },
+        h("span", { class: "num", text: p.num || "?" }),
+        h("span", { class: "ttl", text: p.titre || firstWords(p) || "Sans titre" }),
+        p.issue && p.issue.type === "fin" ? h("span", { class: "flag", text: "fin" }) : h("span", { class: "flag " + st, text: STATUTS[st] }))));
+    });
+    if (!list.length) ul.appendChild(h("li", { class: "empty", text: q ? "Aucun passage ne correspond." : "Aucun passage." }));
+    box.appendChild(ul);
+    return box;
+  }
+  function firstWords(p) { var t = p.segments && p.segments[0] && p.segments[0].texte || ""; return t.split(/\s+/).slice(0, 6).join(" "); }
+
+  function nextNum() {
+    var max = 0;
+    Object.keys(D.passages).forEach(function (id) { var n = parseInt(D.passages[id].num, 10); if (!isNaN(n) && n > max) max = n; });
+    return String(max + 1);
+  }
+  function newPassage(extra) {
+    var id = uid("p");
+    var p = Object.assign({ id: id, num: nextNum(), titre: "", acte: (UI.sel && D.passages[UI.sel] && D.passages[UI.sel].acte) || "1", statut: "afaire",
+      segments: [{ cond: [], texte: "" }], effets: [], issue: { type: "choix", choix: [] }, image: null, notes: "" }, extra || {});
+    D.passages[id] = p;
+    saveLater("passages", id);
+    if (!extra || !extra.silent) { UI.sel = id; UI.view = "passages"; renderTabs(); render(); }
+    delete p.silent;
+    return id;
+  }
+
+  function passageEditor(p) {
+    var sec = h("section", { class: "box", "aria-label": "Passage" });
+    function touch() { saveLater("passages", p.id); }
+    function rerender() { touch(); var y = window.scrollY; render(); window.scrollTo(0, y); }
+
+    /* En-tête */
+    var head = h("div", { class: "box-h" },
+      h("h2", null, "Passage ", h("span", { style: "color:var(--accent)", text: p.num || "?" })),
+      h("div", { class: "toolbar" },
+        h("button", { class: "btn small", onclick: function () { startPreview(p.id); } }, "▶ Jouer d'ici"),
+        h("button", { class: "btn small", onclick: function () { UI.view = "graphe"; UI.gFocus = p.id; renderTabs(); render(); } }, "Voir dans le graphe"),
+        h("button", { class: "btn small", title: "Crée une copie de ce passage", onclick: function () {
+          var c = clone(p); c.id = uid("p"); c.num = nextNum(); c.titre = (p.titre || "") + " (copie)"; c.debutActe = false;
+          D.passages[c.id] = c; saveLater("passages", c.id); UI.sel = c.id; renderTabs(); render(); } }, "Dupliquer"),
+        h("button", { class: "btn small", onclick: function () { UI.preview = !UI.preview; render(); } }, UI.preview ? "Masquer l'aperçu" : "Afficher l'aperçu"),
+        UI.confirmDel
+          ? h("span", { class: "confirm" }, "Supprimer définitivement ?",
+              h("button", { class: "btn small danger", onclick: function () { delete D.passages[p.id]; deleteDoc("passages/" + p.id); UI.sel = null; UI.confirmDel = false; renderTabs(); render(); } }, "Oui, supprimer"),
+              h("button", { class: "btn small", onclick: function () { UI.confirmDel = false; render(); } }, "Annuler"))
+          : h("button", { class: "btn small danger", onclick: function () { UI.confirmDel = true; render(); } }, "Supprimer")));
+    sec.appendChild(head);
+    var b = h("div", { class: "box-b" });
+    sec.appendChild(b);
+
+    var numInput = h("input", { type: "text", id: "f-num", value: p.num, oninput: function (e) { p.num = e.target.value.trim(); touch(); head.querySelector("h2 span").textContent = p.num || "?"; refreshSidebars(); } });
+    b.appendChild(h("div", { class: "row" },
+      h("label", { class: "f", style: "width:7em" }, "Numéro", numInput),
+      h("label", { class: "f grow" }, "Titre (pour toi seulement)", h("input", { type: "text", id: "f-titre", value: p.titre, placeholder: "ex. : Rencontre avec le passeur", oninput: function (e) { p.titre = e.target.value; touch(); refreshSidebars(); } })),
+      h("label", { class: "f" }, "Acte", selectEl([["1", "Acte I"], ["2", "Acte II"], ["3", "Acte III"], ["0", "Aucun"]], String(p.acte || "0"), function (v) { p.acte = v; touch(); refreshSidebars(); }, "f-acte")),
+      h("label", { class: "f" }, "Statut", selectEl(Object.keys(STATUTS).map(function (k) { return [k, STATUTS[k]]; }), p.statut || "afaire", function (v) { p.statut = v; touch(); refreshSidebars(); }, "f-statut"))));
+    b.appendChild(h("label", { class: "f inline" }, h("input", { type: "checkbox", id: "f-debut", checked: !!p.debutActe, onchange: function (e) { p.debutActe = e.target.checked; touch(); } }),
+      "Début d'acte : le jeu sauvegarde ici, et le joueur y revient s'il meurt pendant l'acte"));
+    var dup = sortedPassages().filter(function (x) { return x.id !== p.id && x.num && x.num === p.num; });
+    if (dup.length) b.appendChild(h("div", { class: "hint", style: "color:var(--bad)", text: "Un autre passage porte déjà le numéro " + p.num + "." }));
+
+    /* Image */
+    b.appendChild(imageSection(p, rerender));
+
+    /* Texte */
+    var txt = h("div", { class: "sec" }, h("div", { class: "sec-h" }, h("h3", { text: "Texte" }),
+      h("span", { class: "hint" }, "Genre : ", h("code", { text: "accusé·e" }), " ou ", h("code", { text: neutreOn() ? "{il|elle|iel}" : "{il|elle}" }), " · nom : ", h("code", { text: "{nom}" }), " · italique : ", h("code", { text: "*mot*" }))));
+    (p.segments || []).forEach(function (s, i) {
+      var ta = h("textarea", { class: "story", id: "f-seg-" + i, placeholder: i === 0 ? "Écris ton passage ici, à la deuxième personne et au présent…" : "Texte affiché seulement si la condition est remplie…", value: s.texte, oninput: function (e) { s.texte = e.target.value; touch(); } });
+      var tb = h("div", { class: "toolbar" },
+        h("button", { class: "btn small", title: neutreOn() ? "Insère {il|elle|iel}" : "Insère {il|elle}", onclick: function () { insertAt(ta, neutreOn() ? "{il|elle|iel}" : "{il|elle}"); } }, neutreOn() ? "il / elle / iel" : "il / elle"),
+        h("button", { class: "btn small", title: "Ajoute ·e à la fin du mot", onclick: function () { insertAt(ta, "·e"); } }, "·e"),
+        h("button", { class: "btn small", title: neutreOn() ? "Transforme le mot sélectionné en {masculin|féminin|neutre}" : "Transforme le mot sélectionné en {masculin|féminin}", onclick: function () { wrapSel(ta); } }, neutreOn() ? "{masc|fém|neutre}" : "{masc|fém}"),
+        h("button", { class: "btn small", title: "Insère {nom} : le nom choisi par le joueur", onclick: function () { insertAt(ta, "{nom}"); } }, "Nom du héros"),
+        h("button", { class: "btn small", title: "Met la sélection en italique", onclick: function () { italicSel(ta); } }, "Italique"));
+      if (i === 0) {
+        var wc = h("span", { class: "hint" });
+        var upd = function () { var n = String(ta.value).trim() ? String(ta.value).trim().split(/\s+/).length : 0; wc.textContent = n + " mots · cible 100 à 300"; wc.style.color = n > 300 ? "var(--warn)" : ""; };
+        ta.addEventListener("input", upd); upd();
+        txt.appendChild(h("div", { class: "sec" }, tb, ta, wc));
+      } else {
+        txt.appendChild(h("div", { class: "card cond" },
+          h("div", { class: "sec-h" }, h("strong", { text: "Bloc conditionnel" }), h("button", { class: "btn small danger", onclick: function () { p.segments.splice(i, 1); rerender(); } }, "Retirer le bloc")),
+          condEditor(s.cond = s.cond || [], touch, rerender, "Afficher ce bloc seulement si :"), tb, ta,
+          h("details", { open: (s.effets || []).length ? "open" : null }, h("summary", { class: "hint", text: "Effets de ce bloc" + ((s.effets || []).length ? " · " + s.effets.length : "") }),
+            h("div", { class: "sec", style: "margin-top:6px" }, h("span", { class: "hint", text: "Appliqués à la première visite, seulement si la condition du bloc est remplie (ex. : le Réfugié de Lorme apprend une information)." }),
+              fxEditor(s.effets = s.effets || [], touch, rerender)))));
+      }
+    });
+    txt.appendChild(h("div", null, h("button", { class: "btn", onclick: function () { p.segments.push({ cond: [{ type: "origine", val: "" }], texte: "" }); rerender(); } }, "+ Ajouter un bloc conditionnel")));
+    b.appendChild(txt);
+
+    /* Effets à l'entrée */
+    b.appendChild(h("div", { class: "sec" },
+      h("div", { class: "sec-h" }, h("h3", { text: "En entrant dans ce passage" }), h("span", { class: "hint", text: "Appliqué à la première visite seulement" })),
+      fxEditor(p.effets = p.effets || [], touch, rerender)));
+
+    /* Issue */
+    b.appendChild(issueEditor(p, touch, rerender));
+
+    /* Notes */
+    b.appendChild(h("label", { class: "f" }, "Notes (pour toi seulement)", h("textarea", { id: "f-notes", value: p.notes || "", placeholder: "Idées, doutes, choses à vérifier…", oninput: function (e) { p.notes = e.target.value; touch(); } })));
+    return sec;
+  }
+
+  function insertAt(ta, str) {
+    var a = ta.selectionStart, z = ta.selectionEnd;
+    ta.value = ta.value.slice(0, a) + str + ta.value.slice(z);
+    ta.focus(); ta.setSelectionRange(a + str.length, a + str.length);
+    ta.dispatchEvent(new Event("input"));
+  }
+  function wrapSel(ta) {
+    var a = ta.selectionStart, z = ta.selectionEnd, sel = ta.value.slice(a, z) || "masculin";
+    var str = "{" + sel + "|" + sel + (neutreOn() ? "|" + sel : "") + "}";
+    ta.value = ta.value.slice(0, a) + str + ta.value.slice(z);
+    ta.focus(); ta.setSelectionRange(a + sel.length + 2, a + sel.length * 2 + 2);
+    ta.dispatchEvent(new Event("input"));
+  }
+  function italicSel(ta) {
+    var a = ta.selectionStart, z = ta.selectionEnd, sel = ta.value.slice(a, z);
+    var str = "*" + sel + "*";
+    ta.value = ta.value.slice(0, a) + str + ta.value.slice(z);
+    ta.focus(); ta.setSelectionRange(a + 1, a + 1 + sel.length);
+    ta.dispatchEvent(new Event("input"));
+  }
+
+  function selectEl(opts, val, onchange, id) {
+    var s = h("select", { id: id || null, onchange: function (e) { onchange(e.target.value); } });
+    opts.forEach(function (o) { s.appendChild(h("option", { value: o[0], selected: String(val) === String(o[0]) ? "selected" : null }, o[1])); });
+    if (val && !opts.some(function (o) { return String(o[0]) === String(val); })) s.appendChild(h("option", { value: val, selected: "selected" }, "(introuvable : " + val + ")"));
+    return s;
+  }
+  function catOpts(col, empty) {
+    var o = empty ? [["", empty]] : [];
+    return o.concat(catList(col).map(function (x) { return [x.id, x.nom || "(sans nom)"]; }));
+  }
+  function passageOpts(empty) {
+    return [["", empty || "— choisir —"]].concat(sortedPassages().map(function (x) { return [x.id, (x.num || "?") + (x.titre ? " · " + x.titre : "")]; }));
+  }
+  function targetPicker(obj, key, touch, rerender, label) {
+    return h("div", { class: "mini-row" },
+      label ? h("span", { class: "hint", text: label }) : null,
+      selectEl(passageOpts(), obj[key] || "", function (v) { obj[key] = v; touch(); refreshPreviewSoon(); }),
+      h("button", { class: "btn small", title: "Crée un passage vide et le relie ici", onclick: function () { obj[key] = newPassage({ silent: true }); rerender(); } }, "+ nouveau"),
+      obj[key] && D.passages[obj[key]] ? h("button", { class: "btn small", onclick: function () { UI.sel = obj[key]; render(); } }, "Aller →") : null);
+  }
+
+  /* Image */
+  function imageSection(p, rerender) {
+    var s = h("div", { class: "sec" }, h("div", { class: "sec-h" }, h("h3", { text: "Illustration" })));
+    if (p.image) {
+      s.appendChild(h("img", { class: "thumb", src: imgSrc(p.image), "data-img": p.image, alt: "Illustration du passage " + (p.num || "") }));
+      if (assets) s.appendChild(h("div", null, h("button", { class: "btn small danger", onclick: function () { var old = p.image; p.image = null; rerender(); assets.delete(old).catch(function () {}); } }, "Retirer l'image")));
+    } else if (assets) {
+      var inp = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp,image/gif", id: "f-img", onchange: function (e) {
+        var f = e.target.files[0]; if (!f) return;
+        msg.textContent = "Envoi de l'image…";
+        assets.upload(f).then(function (r) { p.image = r.id; rerender(); }, function (err) {
+          msg.textContent = err && err.code === "too_large" ? "Image trop lourde (20 Mo maximum)." : err && err.code === "unsupported_type" ? "Format non accepté : PNG, JPEG, WebP ou GIF." : "L'envoi a échoué, réessaie.";
+        });
+      } });
+      var msg = h("span", { class: "hint", text: GH ? "PNG, JPEG, WebP ou GIF. Facultatif. Garde des images légères (moins de 1 Mo) : elles sont intégrées au jeu publié." : "PNG, JPEG, WebP ou GIF, 20 Mo maximum. Facultatif." });
+      s.appendChild(h("div", { class: "mini-row" }, inp, msg));
+    } else {
+      s.appendChild(h("span", { class: "hint", text: "L'ajout d'images demande d'être connecté au dépôt du livre." }));
+    }
+    return s;
+  }
+
+  /* Conditions */
+  var COND_TYPES = [
+    ["origine", "Origine est"], ["occupation", "Occupation est"], ["genre", "Genre est"],
+    ["objet", "Possède l'objet"], ["sansobjet", "Ne possède pas l'objet"], ["mot", "Connaît le Mot"],
+    ["info", "Connaît l'information"], ["sansinfo", "Ne connaît pas l'information"],
+    ["stat", "Caractéristique"], ["usure", "Usure"], ["compteur", "Compteur de l'Ordre"], ["visite", "A déjà visité le passage"]
+  ];
+  function condEditor(list, touch, rerender, title) {
+    var box = h("div", { class: "sec" });
+    if (title) box.appendChild(h("span", { class: "hint", text: title + (list.length > 1 ? " (toutes les conditions)" : "") }));
+    var rows = h("div", { class: "mini-rows" });
+    list.forEach(function (c, i) {
+      var row = h("div", { class: "mini-row" });
+      row.appendChild(selectEl(COND_TYPES, c.type, function (v) { list[i] = { type: v }; rerender(); }));
+      condValue(c, row, touch);
+      row.appendChild(h("button", { class: "x", title: "Retirer la condition", "aria-label": "Retirer la condition", onclick: function () { list.splice(i, 1); rerender(); } }, "×"));
+      rows.appendChild(row);
+    });
+    box.appendChild(rows);
+    box.appendChild(h("div", null, h("button", { class: "btn small", onclick: function () { list.push({ type: "objet" }); rerender(); } }, "+ condition")));
+    return box;
+  }
+  function condValue(c, row, touch) {
+    var R_ = R();
+    function set(k) { return function (v) { c[k] = v; touch(); refreshPreviewSoon(); }; }
+    if (c.type === "origine") row.appendChild(selectEl([["", "— choisir —"]].concat(R_.origines.map(function (o) { return [o.nom, o.nom]; })), c.val || "", set("val")));
+    else if (c.type === "occupation") row.appendChild(selectEl([["", "— choisir —"]].concat(R_.occupations.map(function (o) { return [o.nom, o.nom]; })), c.val || "", set("val")));
+    else if (c.type === "genre") row.appendChild(selectEl(genreOpts(false), c.val || "m", set("val")));
+    else if (c.type === "objet" || c.type === "sansobjet") {
+      row.appendChild(selectEl(catOpts("objets", "— objet —"), c.val || "", set("val")));
+      if (c.type === "objet") row.appendChild(h("label", { class: "f inline" }, "quantité ≥", h("input", { type: "number", min: 1, value: c.n || 1, oninput: function (e) { c.n = +e.target.value || 1; touch(); } })));
+    }
+    else if (c.type === "mot") row.appendChild(selectEl(catOpts("mots", "— Mot —"), c.val || "", set("val")));
+    else if (c.type === "info" || c.type === "sansinfo") row.appendChild(selectEl(catOpts("infos", "— information —"), c.val || "", set("val")));
+    else if (c.type === "visite") row.appendChild(selectEl(passageOpts(), c.val || "", set("val")));
+    else {
+      if (c.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), c.stat || "for", set("stat")));
+      row.appendChild(selectEl([[">=", "≥"], ["<=", "≤"], ["==", "="]], c.op || ">=", set("op")));
+      row.appendChild(h("input", { type: "number", value: c.n == null ? 1 : c.n, oninput: function (e) { c.n = +e.target.value; touch(); } }));
+    }
+  }
+
+  /* Effets */
+  var FX_TYPES = [
+    ["donner", "Donner l'objet"], ["retirer", "Retirer l'objet"], ["mot", "Apprendre le Mot"],
+    ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["stat", "Modifier une caractéristique"],
+    ["usure", "Ajouter de l'Usure"], ["compteur", "Avancer le compteur de l'Ordre"]
+  ];
+  function fxEditor(list, touch, rerender) {
+    var box = h("div", { class: "sec" });
+    var rows = h("div", { class: "mini-rows" });
+    list.forEach(function (f, i) {
+      var row = h("div", { class: "mini-row" });
+      row.appendChild(selectEl(FX_TYPES, f.type, function (v) { list[i] = { type: v }; rerender(); }));
+      function set(k) { return function (v) { f[k] = v; touch(); }; }
+      if (f.type === "donner" || f.type === "retirer") {
+        row.appendChild(selectEl(catOpts("objets", "— objet —"), f.val || "", set("val")));
+        row.appendChild(h("label", { class: "f inline" }, "×", h("input", { type: "number", min: 1, value: f.n || 1, oninput: function (e) { f.n = +e.target.value || 1; touch(); } })));
+      } else if (f.type === "mot") row.appendChild(selectEl(catOpts("mots", "— Mot —"), f.val || "", set("val")));
+      else if (f.type === "info" || f.type === "oubli") row.appendChild(selectEl(catOpts("infos", "— information —"), f.val || "", set("val")));
+      else {
+        if (f.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), f.stat || "vig", set("stat")));
+        row.appendChild(h("input", { type: "number", value: f.n == null ? (f.type === "stat" ? -1 : 1) : f.n, oninput: function (e) { f.n = +e.target.value; touch(); } }));
+      }
+      row.appendChild(h("button", { class: "x", "aria-label": "Retirer l'effet", title: "Retirer l'effet", onclick: function () { list.splice(i, 1); rerender(); } }, "×"));
+      rows.appendChild(row);
+    });
+    if (!list.length) rows.appendChild(h("span", { class: "hint", text: "Aucun effet." }));
+    box.appendChild(rows);
+    box.appendChild(h("div", null, h("button", { class: "btn small", onclick: function () { list.push({ type: "donner", n: 1 }); rerender(); } }, "+ effet")));
+    return box;
+  }
+
+  /* Issue */
+  function issueEditor(p, touch, rerender) {
+    var is = p.issue = p.issue || { type: "choix", choix: [] };
+    var box = h("div", { class: "sec" });
+    box.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Ce passage se termine par" })));
+    var seg = h("div", { class: "seg", role: "group", "aria-label": "Type d'issue" });
+    [["choix", "Des choix"], ["test", "Un test"], ["combat", "Un combat"], ["fin", "Une fin"]].forEach(function (o) {
+      seg.appendChild(h("button", { "aria-pressed": is.type === o[0] ? "true" : "false", onclick: function () {
+        if (is.type === o[0]) return;
+        is.type = o[0];
+        if (o[0] === "choix" && !is.choix) is.choix = [];
+        if (o[0] === "test" && !is.stat) { is.stat = "hab"; is.modif = 0; }
+        if (o[0] === "fin" && !is.fin) is.fin = "Mort";
+        rerender();
+      } }, o[1]));
+    });
+    box.appendChild(seg);
+
+    if (is.type === "choix") {
+      is.choix = is.choix || [];
+      is.choix.forEach(function (c, i) {
+        c.cond = c.cond || []; c.effets = c.effets || [];
+        var card = h("div", { class: "card" });
+        card.appendChild(h("div", { class: "sec-h" }, h("strong", { text: "Choix " + (i + 1) }),
+          h("div", { class: "toolbar" },
+            i > 0 ? h("button", { class: "btn small", title: "Monter", onclick: function () { is.choix.splice(i - 1, 0, is.choix.splice(i, 1)[0]); rerender(); } }, "↑") : null,
+            h("button", { class: "btn small danger", onclick: function () { is.choix.splice(i, 1); rerender(); } }, "Retirer"))));
+        card.appendChild(h("input", { type: "text", id: "f-choix-" + i, value: c.texte || "", placeholder: "Texte du choix, ex. : Descendre dans la crypte", oninput: function (e) { c.texte = e.target.value; touch(); refreshPreviewSoon(); } }));
+        card.appendChild(targetPicker(c, "cible", touch, rerender, "mène au passage"));
+        var more = h("details", { open: c.cond.length || c.effets.length ? "open" : null });
+        more.appendChild(h("summary", { class: "hint", text: "Condition et effets" + (c.cond.length ? " · " + c.cond.length + " condition(s)" : "") + (c.effets.length ? " · " + c.effets.length + " effet(s)" : "") }));
+        var inner = h("div", { class: "sec", style: "margin-top:8px" });
+        inner.appendChild(condEditor(c.cond, touch, rerender, "Ce choix n'est possible que si :"));
+        if (c.cond.length) {
+          inner.appendChild(h("div", { class: "mini-row" },
+            h("span", { class: "hint", text: "Sinon :" }),
+            selectEl([["cache", "le choix est caché"], ["grise", "le choix est grisé, avec une raison"]], c.affichage || "cache", function (v) { c.affichage = v; rerender(); }),
+            c.affichage === "grise" ? h("input", { type: "text", value: c.raison || "", placeholder: "ex. : Il te faudrait une clé.", oninput: function (e) { c.raison = e.target.value; touch(); } }) : null));
+        }
+        inner.appendChild(h("span", { class: "hint", text: "Effets quand le joueur prend ce choix (à chaque fois) :" }));
+        inner.appendChild(fxEditor(c.effets, touch, rerender));
+        more.appendChild(inner);
+        card.appendChild(more);
+        box.appendChild(card);
+      });
+      box.appendChild(h("div", null, h("button", { class: "btn", onclick: function () { is.choix.push({ texte: "", cible: "", cond: [], effets: [] }); rerender(); } }, "+ Ajouter un choix")));
+    } else if (is.type === "test") {
+      box.appendChild(h("div", { class: "card" },
+        h("div", { class: "row" },
+          h("label", { class: "f" }, "Caractéristique testée", selectEl(TEST_STATS.map(function (k) { return [k, STATS[k]]; }), is.stat || "hab", function (v) { is.stat = v; touch(); })),
+          h("label", { class: "f" }, "Modificateur", h("input", { type: "number", value: is.modif || 0, oninput: function (e) { is.modif = +e.target.value || 0; touch(); } })),
+          h("span", { class: "hint grow", text: "Réussite si 1d20 ≤ caractéristique + modificateur. Un test de Chance est toujours un pari risqué." })),
+        targetPicker(is, "succes", touch, rerender, "Réussite →"),
+        targetPicker(is, "echec", touch, rerender, "Échec →")));
+    } else if (is.type === "combat") {
+      box.appendChild(h("div", { class: "card" },
+        h("label", { class: "f" }, "Ennemi", selectEl(catOpts("ennemis", "— choisir un ennemi —"), is.ennemi || "", function (v) { is.ennemi = v; touch(); })),
+        targetPicker(is, "victoire", touch, rerender, "Victoire →"),
+        h("span", { class: "hint", text: "Pas de fuite une fois le combat engagé. En cas de défaite, le joueur reprend au début de l'acte." })));
+    } else if (is.type === "fin") {
+      box.appendChild(h("div", { class: "card" }, h("div", { class: "row" },
+        h("label", { class: "f" }, "Type de fin", selectEl(FINS.map(function (f) { return [f, f]; }), is.fin || "Mort", function (v) { is.fin = v; touch(); })),
+        h("label", { class: "f grow" }, "Titre de la fin", h("input", { type: "text", value: is.titreFin || "", placeholder: "ex. : Une nouvelle main touche l'Âme de Cristal", oninput: function (e) { is.titreFin = e.target.value; touch(); } }))),
+        h("span", { class: "hint", text: "Le texte du passage sert d'épilogue." })));
+    }
+    return box;
+  }
+
+  /* =====================================================================
+     Aperçu jouable
+     ===================================================================== */
+  var P = null;
+  var pvTimer = null;
+  function refreshPreviewSoon() { clearTimeout(pvTimer); pvTimer = setTimeout(function () { var el = document.getElementById("previewBox"); if (el) el.replaceWith(previewPanel()); }, 400); }
+
+  /* Équipement : bonus des objets équipés */
+  function equipped() {
+    var out = [];
+    if (!P || !P.eq) return out;
+    ["arme", "armure", "talisman"].forEach(function (slot) { var id = P.eq[slot]; if (id && D.objets[id] && (P.inv[id] || 0) > 0) out.push(D.objets[id]); });
+    return out;
+  }
+  function bonus(k) {
+    return equipped().reduce(function (n, o) { return n + (o.bonus_stat === k ? (+o.bonus_val || 0) : 0); }, 0);
+  }
+  function eff(k) {
+    if (k === "vigMax") return P.s.vigMax + bonus("vigMax");
+    if (k === "manMax") return P.s.manMax + bonus("manMax");
+    if (k === "vig") return P.s.vig;
+    if (k === "man") return P.s.man;
+    return Math.max(0, (P.s[k] || 0) + bonus(k));
+  }
+  function slotOf(o) { return o && (o.categorie === "arme" || o.categorie === "armure" || o.categorie === "talisman") ? o.categorie : null; }
+  function occOf(name) { return R().occupations.filter(function (o) { return o.nom === name; })[0] || null; }
+  function newPlayer(setup) {
+    var R_ = R(), o = occOf(setup.occupation) || { fav: [] };
+    var fav = o.fav || [];
+    var s = setup.rolled ? { for: +setup.rolled.for, hab: +setup.rolled.hab, sag: +setup.rolled.sag } : { for: +R_.base.for || 12, hab: +R_.base.hab || 12, sag: +R_.base.sag || 11 };
+    ["for", "hab", "sag"].forEach(function (k) { if (fav.indexOf(k) >= 0) s[k] += 2; });
+    s.vigMax = s.for + 6 + (fav.indexOf("vig") >= 0 ? 2 : 0);
+    s.manMax = s.sag + 2 + (fav.indexOf("man") >= 0 ? 2 : 0);
+    s.vig = s.vigMax; s.man = s.manMax; s.cha = Math.floor(s.hab / 2);
+    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], vus: {}, cur: null, log: [], combat: null, test: null, start: null, save: null };
+  }
+  function defaultSetup() {
+    if (UI.setup) return UI.setup;
+    var R_ = R();
+    return UI.setup = { genre: "m", origine: R_.origines[0] ? R_.origines[0].nom : "", occupation: R_.occupations[0] ? R_.occupations[0].nom : "" };
+  }
+  function startPreview(pid) {
+    var setup = defaultSetup();
+    P = newPlayer(setup);
+    P.start = pid; P.mode = "apercu";
+    UI.preview = true;
+    enter(pid, true);
+    if (UI.view !== "passages") { UI.view = "passages"; renderTabs(); }
+    render();
+  }
+
+  function condOk(c) {
+    var s = P.s;
+    function cmp(v) { var n = +c.n || 0; return c.op === "<=" ? v <= n : c.op === "==" ? v === n : v >= n; }
+    switch (c.type) {
+      case "origine": return P.setup.origine === c.val;
+      case "occupation": return P.setup.occupation === c.val;
+      case "genre": return P.setup.genre === (c.val || "m");
+      case "objet": return (P.inv[c.val] || 0) >= (+c.n || 1);
+      case "sansobjet": return !(P.inv[c.val] > 0);
+      case "mot": return P.mots.indexOf(c.val) >= 0;
+      case "info": return P.infos.indexOf(c.val) >= 0;
+      case "sansinfo": return P.infos.indexOf(c.val) < 0;
+      case "visite": return !!P.vus[c.val];
+      case "stat": return cmp(eff(c.stat || "for"));
+      case "usure": return cmp(P.usure);
+      case "compteur": return cmp(P.compteur);
+    }
+    return true;
+  }
+  function allOk(list) { return (list || []).every(condOk); }
+  function applyFx(list) {
+    var out = [];
+    (list || []).forEach(function (f) {
+      var n = f.n == null ? 1 : +f.n, nm;
+      if (f.type === "donner" && f.val) {
+        P.inv[f.val] = (P.inv[f.val] || 0) + (n || 1); nm = D.objets[f.val]; out.push("+ " + (nm ? nm.nom : "objet") + (n > 1 ? " ×" + n : ""));
+        var sl = slotOf(nm); if (sl && !P.eq[sl]) { P.eq[sl] = f.val; out.push(nm.nom + " équipé"); }
+      }
+      else if (f.type === "retirer" && f.val) {
+        P.inv[f.val] = Math.max(0, (P.inv[f.val] || 0) - (n || 1)); if (!P.inv[f.val]) { delete P.inv[f.val]; Object.keys(P.eq).forEach(function (k) { if (P.eq[k] === f.val) delete P.eq[k]; }); }
+        nm = D.objets[f.val]; out.push("− " + (nm ? nm.nom : "objet"));
+        P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax"));
+      }
+      else if (f.type === "mot" && f.val && P.mots.indexOf(f.val) < 0) { P.mots.push(f.val); nm = D.mots[f.val]; out.push("Mot appris : " + (nm ? nm.nom : "?")); }
+      else if (f.type === "info" && f.val && P.infos.indexOf(f.val) < 0) { P.infos.push(f.val); nm = D.infos[f.val]; out.push("Information : " + (nm ? nm.nom : "?")); }
+      else if (f.type === "oubli" && f.val) { P.infos = P.infos.filter(function (x) { return x !== f.val; }); }
+      else if (f.type === "stat") {
+        var k = f.stat || "vig";
+        if (k === "vig") P.s.vig = Math.max(0, Math.min(eff("vigMax"), P.s.vig + n));
+        else if (k === "man") P.s.man = Math.max(0, Math.min(eff("manMax"), P.s.man + n));
+        else P.s[k] = Math.max(0, P.s[k] + n);
+        out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
+      }
+      else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure"); }
+      else if (f.type === "compteur") { P.compteur += n; out.push("Compteur de l'Ordre : " + P.compteur); }
+    });
+    return out;
+  }
+  function enter(pid, first) {
+    var p = D.passages[pid];
+    P.cur = pid; P.combat = null; P.test = null; P.fx = [];
+    if (!p) return;
+    if (!P.vus[pid]) {
+      P.fx = applyFx(p.effets);
+      (p.segments || []).forEach(function (sg, i) { if (i > 0 && (sg.effets || []).length && allOk(sg.cond)) P.fx = P.fx.concat(applyFx(sg.effets)); });
+    }
+    P.vus[pid] = true;
+    if (p.debutActe) { var snap = JSON.parse(JSON.stringify(P)); snap.save = null; snap.combat = null; snap.test = null; P.save = snap; P.fx = P.fx.concat(["Sauvegarde : début de l'acte"]); }
+    if (p.issue && p.issue.type === "combat") P.combat = newCombat(p.issue.ennemi);
+  }
+  function go(pid, fx) {
+    if (!pid || !D.passages[pid]) return;
+    var pre = applyFx(fx);
+    enter(pid);
+    P.fx = pre.concat(P.fx || []);
+    var el = document.getElementById("previewBox"); if (el) el.replaceWith(previewPanel());
+    var top = document.getElementById("previewBox"); if (top && top.getBoundingClientRect().top < 0) top.scrollIntoView();
+  }
+
+  function rePv() { var el = document.getElementById("previewBox"); if (el) el.replaceWith(previewPanel()); }
+  function previewPanel() {
+    var play = UI.view === "jouer";
+    var box = h(play ? "section" : "aside", { class: play ? "box reader" : "box side-right sticky", id: "previewBox", "aria-label": play ? "Partie" : "Aperçu jouable" });
+    if (play) {
+      box.appendChild(h("div", { class: "box-h" }, h("h3", { text: R().titre || "Partie" }),
+        h("div", { class: "toolbar" }, h("button", { class: "btn small", onclick: function () { UI.playNew = true; render(); } }, "Nouvelle partie"))));
+    } else
+    box.appendChild(h("div", { class: "box-h" }, h("h3", { text: "Aperçu jouable" }),
+      h("div", { class: "toolbar" },
+        P ? h("button", { class: "btn small", onclick: function () { startPreview(P.start); } }, "Recommencer") : null,
+        UI.sel ? h("button", { class: "btn small", onclick: function () { startPreview(UI.sel); } }, "Jouer ce passage") : null,
+        R().depart && D.passages[R().depart] ? h("button", { class: "btn small", onclick: function () { startPreview(R().depart); } }, "Depuis le début") : null)));
+    var b = h("div", { class: "box-b" });
+    box.appendChild(b);
+
+    var setup = defaultSetup();
+    var R_ = R();
+    if (!play) {
+    function changeSetup(k) { return function (v) { setup[k] = v; if (P) { var st = P.start; P = newPlayer(setup); P.start = st; P.mode = "apercu"; enter(st); } else { P = null; } var el = document.getElementById("previewBox"); el.replaceWith(previewPanel()); }; }
+    b.appendChild(h("div", { class: "pv-setup" },
+      h("label", { class: "f" }, "Nom", h("input", { type: "text", value: setup.nom || "", placeholder: R_.nomDefaut || "Voyageur", oninput: function (e) { setup.nom = e.target.value; if (P) P.setup.nom = e.target.value; clearTimeout(pvTimer); pvTimer = setTimeout(function () { var el = document.getElementById("previewBox"); if (!el) return; var ae = document.activeElement, pos = ae && ae.selectionStart; el.replaceWith(previewPanel()); var ni = document.querySelector("#previewBox .pv-setup input"); if (ni) { ni.focus(); try { ni.setSelectionRange(pos, pos); } catch (x) {} } }, 300); } })),
+      h("label", { class: "f" }, "Genre", selectEl(genreOpts(true), setup.genre, changeSetup("genre"))),
+      h("label", { class: "f" }, "Origine", selectEl(R_.origines.length ? R_.origines.map(function (o) { return [o.nom, o.nom]; }) : [["", "(aucune)"]], setup.origine, changeSetup("origine"))),
+      h("label", { class: "f" }, "Occupation", selectEl(R_.occupations.length ? R_.occupations.map(function (o) { return [o.nom, o.nom]; }) : [["", "(aucune)"]], setup.occupation, changeSetup("occupation")))));
+    }
+
+    if (!P || !P.cur) {
+      b.appendChild(h("p", { class: "hint", text: "Choisis un personnage, puis lance « Jouer ce passage » : tu joues avec le vrai moteur, combats, tests et inventaire compris. Les effets s'appliquent comme dans le livre." }));
+      return box;
+    }
+    var s = P.s;
+    if (play) b.appendChild(h("div", { class: "hint", text: heroName() + " · " + (P.setup.genre === "f" ? "héroïne" : P.setup.genre === "n" ? "iel" : "héros") + " · " + (P.setup.origine || "") + " · " + (P.setup.occupation || "") }));
+    b.appendChild(h("div", { class: "pv-stats", html:
+      "Vigueur <b>" + s.vig + "/" + eff("vigMax") + "</b> Mana <b>" + s.man + "/" + eff("manMax") + "</b> For <b>" + eff("for") + "</b> Hab <b>" + eff("hab") + "</b> Sag <b>" + eff("sag") + "</b> Chance <b>" + eff("cha") + "</b> Usure <b>" + P.usure + "</b>" + (play ? "" : " Compteur <b>" + P.compteur + "</b>") }));
+    var w0 = weapon();
+    b.appendChild(h("div", { class: "pv-inv", text: "Arme : " + w0.nom + " (" + w0.txt + ", " + STATS[w0.atk] + ") · armure " + w0.armure + (w0.parade ? " · parade +" + w0.parade : "") }));
+    var inv = Object.keys(P.inv).map(function (k) { return (D.objets[k] ? D.objets[k].nom : "?") + (P.inv[k] > 1 ? " ×" + P.inv[k] : ""); });
+    var mots = P.mots.map(function (k) { return D.mots[k] ? D.mots[k].nom : "?"; });
+    var infos = P.infos.map(function (k) { return D.infos[k] ? D.infos[k].nom : "?"; });
+    b.appendChild(h("div", { class: "pv-inv", html: "<b>Sac :</b> " + (inv.length ? esc(inv.join(", ")) : "vide") + (mots.length ? " · <b>Mots :</b> " + esc(mots.join(", ")) : "") + (infos.length ? " · <b>Informations :</b> " + esc(infos.join(", ")) : "") }));
+    var equipables = Object.keys(P.inv).filter(function (k) { return slotOf(D.objets[k]); });
+    if (equipables.length) b.appendChild(h("div", { class: "toolbar" }, equipables.map(function (k) {
+      var o = D.objets[k], sl = slotOf(o), on = P.eq[sl] === k;
+      return h("button", { class: "btn small", "aria-pressed": on ? "true" : "false", onclick: function () {
+        if (on) delete P.eq[sl]; else P.eq[sl] = k;
+        P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax")); rePv();
+      } }, (on ? "✓ " : "Équiper : ") + o.nom);
+    })));
+    var usable = Object.keys(P.inv).filter(function (k) { return D.objets[k] && D.objets[k].effet_stat; });
+    if (usable.length && P.s.vig > 0) b.appendChild(h("div", { class: "toolbar" }, usable.map(function (k) {
+      var o = D.objets[k];
+      return h("button", { class: "btn small", onclick: function () {
+        var fx = applyFx([{ type: o.effet_stat === "usure" ? "usure" : "stat", stat: o.effet_stat, n: +o.effet_val || 0 }]);
+        if (o.consommable) applyFx([{ type: "retirer", val: k, n: 1 }]);
+        P.fx = [o.nom + " utilisé : " + fx.join(", ")];
+        var el = document.getElementById("previewBox"); el.replaceWith(previewPanel());
+      } }, "Utiliser : " + o.nom);
+    })));
+
+    var p = D.passages[P.cur];
+    var page = h("div", { class: "pv-page" });
+    b.appendChild(page);
+    if (!p) { page.appendChild(h("p", { class: "hint", text: "Ce passage n'existe plus." })); return box; }
+    page.appendChild(h("div", { class: "pv-num", text: p.num || "?" }));
+    if (p.image) page.appendChild(h("img", { class: "pv-img", src: imgSrc(p.image), "data-img": p.image, alt: "" }));
+    if (P.fx && P.fx.length) page.appendChild(h("div", { class: "pv-fx", text: P.fx.join(" · ") }));
+    var text = h("div", { class: "pv-text" });
+    (p.segments || []).forEach(function (sg, i) {
+      if (i > 0 && !allOk(sg.cond)) return;
+      var d = h("div", { class: i > 0 ? "condseg" : null, html: richText(genre(sg.texte, P.setup.genre)) });
+      text.appendChild(d);
+    });
+    if (!text.textContent.trim()) text.appendChild(h("p", { class: "hint", text: "(Passage sans texte pour l'instant.)" }));
+    page.appendChild(text);
+
+    if (P.s.vig <= 0) {
+      page.appendChild(h("div", { class: "pv-end" }, h("h4", { class: "ko", text: "Tu meurs" }),
+        P.save ? h("button", { class: "btn primary", onclick: function () { var sv = P.save; P = JSON.parse(JSON.stringify(sv)); P.save = sv; enter(P.cur); P.vus[P.cur] = true; rePv(); } }, "Reprendre au début de l'acte")
+          : h("p", { class: "hint", text: "Aucun passage « début d'acte » n'a été traversé : coche cette case sur le premier passage de chaque acte pour activer la sauvegarde." })));
+      return box;
+    }
+    var is = p.issue || {};
+    if (is.type === "choix") {
+      var shown = 0;
+      (is.choix || []).forEach(function (c) {
+        var ok = allOk(c.cond);
+        if (!ok && (c.affichage || "cache") === "cache") return;
+        shown++;
+        page.appendChild(h("button", { class: "pv-choice", disabled: !ok || !c.cible ? "disabled" : null, onclick: function () { go(c.cible, c.effets); } }, genre(c.texte || "(choix sans texte)", P.setup.genre)));
+        if (!ok && c.raison) page.appendChild(h("div", { class: "pv-reason", text: c.raison }));
+        if (ok && !c.cible) page.appendChild(h("div", { class: "pv-reason", text: "Ce choix ne mène encore nulle part." }));
+      });
+      if (!shown) page.appendChild(h("p", { class: "ko", text: "Impasse : aucun choix possible ici." }));
+    } else if (is.type === "test") {
+      var val = eff(is.stat || "hab") + (+is.modif || 0);
+      var tb = h("div", { class: "sec" });
+      if (!P.test) {
+        tb.appendChild(h("p", { class: "hint", text: "Test de " + STATS[is.stat] + (is.modif ? " (" + (is.modif > 0 ? "+" : "") + is.modif + ")" : "") + " : réussite sur " + val + " ou moins au d20." }));
+        tb.appendChild(h("button", { class: "btn primary", onclick: function () { var r = rnd(20); P.test = { r: r, ok: r <= val, val: val }; var el = document.getElementById("previewBox"); el.replaceWith(previewPanel()); } }, "Lancer le d20"));
+      } else {
+        tb.appendChild(h("p", { html: '<span class="die ' + (P.test.ok ? "ok" : "ko") + '">' + P.test.r + "</span>" + (P.test.ok ? '<span class="ok">Réussite</span>' : '<span class="ko">Échec</span>') + " (" + P.test.r + (P.test.ok ? " ≤ " : " > ") + P.test.val + ")" }));
+        var tgt = P.test.ok ? is.succes : is.echec;
+        tb.appendChild(tgt ? h("button", { class: "pv-choice", onclick: function () { go(tgt); } }, "Continuer") : h("p", { class: "ko", text: "Aucun passage n'est relié à ce résultat." }));
+      }
+      page.appendChild(tb);
+    } else if (is.type === "combat") {
+      if (play) {
+        page.appendChild(h("p", { class: "hint", text: "Le combat s'ouvre par-dessus le passage." }));
+        box.appendChild(h("div", { class: "cb-overlay" }, h("div", { class: "cb-dialog", role: "dialog", "aria-modal": "true", "aria-label": "Combat" },
+          h("div", { class: "sec-h" }, h("h3", { class: "cb-title", text: "Combat" }), h("div", { class: "toolbar" }, h("span", { class: "hint", style: "color:var(--bad)", text: "pas de fuite" }),
+            h("button", { class: "btn small", title: "Ce bouton n'existe que dans l'atelier, pas dans le jeu publié", onclick: function () { UI.view = "passages"; renderTabs(); render(); } }, "Revenir à l'atelier"))),
+          combatView(is))));
+      } else page.appendChild(combatView(is));
+    } else if (is.type === "fin") {
+      page.appendChild(h("div", { class: "pv-end" }, h("h4", { text: is.titreFin || is.fin }), h("span", { class: "pill", text: is.fin })));
+    } else {
+      page.appendChild(h("p", { class: "ko", text: "Ce passage n'a pas encore d'issue." }));
+    }
+    return box;
+  }
+
+  /* ---------- Combat (système des intentions) ---------- */
+  function foeDef(id) { return D.ennemis[id] || null; }
+  function newCombat(eid) {
+    var e = foeDef(eid);
+    if (!e) return { missing: true };
+    var c = { eid: eid, vig: +e.vig || 10, max: +e.vig || 10, turn: 1, idx: 0, phase: 1, log: [], over: null };
+    newTurn(c);
+    return c;
+  }
+  function cycleOf(e, c) {
+    var c2 = lines(String(e.cycle2 || "").replace(/,/g, "\n"));
+    var c1 = lines(String(e.cycle1 || "lourd, rapides, garde").replace(/,/g, "\n"));
+    var list = c.phase === 2 && c2.length ? c2 : c1;
+    return list.map(function (x) { x = x.toLowerCase(); return x.indexOf("lourd") >= 0 ? "lourd" : x.indexOf("rapide") >= 0 ? "rapides" : x.indexOf("garde") >= 0 ? "garde" : x.indexOf("incant") >= 0 ? "incant" : "lourd"; });
+  }
+  function newTurn(c) {
+    var e = foeDef(c.eid), cy = cycleOf(e, c);
+    c.it = cy[c.idx % cy.length];
+    c.revealed = !e.voile; c.observed = false;
+    c.said = pick(lines(e["ph_" + c.it])) || INTENTS[c.it] + ".";
+    var veil = c.it === "lourd" || c.it === "rapides" ? e.voile_a : e.voile_b;
+    c.veilSaid = pick(lines(veil)) || "Tu ne parviens pas à lire son geste.";
+  }
+  function weapon() {
+    var o = occOf(P.setup.occupation) || {};
+    var w = { nom: o.arme || "Arme", txt: o.degats || "1d6", dmg: parseDice(o.degats || "1d6"), atk: o.attaque || "for", armure: +o.armure || 0, parade: +o.parade || 0 };
+    var a = P.eq && P.eq.arme && D.objets[P.eq.arme];
+    if (a && P.inv[P.eq.arme]) { w.nom = a.nom; w.txt = a.arme_degats || w.txt; w.dmg = parseDice(w.txt); w.atk = a.arme_attaque || w.atk; }
+    equipped().forEach(function (x) { w.armure += +x.bonus_armure || 0; w.parade += +x.bonus_parade || 0; });
+    return w;
+  }
+  function combatView(is) {
+    var c = P.combat, box = h("div", { class: "sec" });
+    if (!c || c.missing) { box.appendChild(h("p", { class: "ko", text: "Aucun ennemi choisi pour ce combat." })); return box; }
+    var e = foeDef(c.eid), w = weapon(), s = P.s;
+    var tuto = !!e.tutoriel;
+    box.appendChild(h("div", { class: "sec-h" }, h("strong", { text: e.nom || "Ennemi" }), UI.view === "jouer" ? null : h("span", { class: "hint", text: "Déf " + (e.def || 0) + " · Menace " + (e.menace || 0) + " · " + (e.degats || "1d6") })));
+    box.appendChild(h("div", { class: "bar" }, h("i", { style: "width:" + (100 * c.vig / c.max) + "%" })));
+    box.appendChild(h("div", { class: "hint", text: "Vigueur ennemie " + c.vig + "/" + c.max + " · ta Vigueur " + s.vig + "/" + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }));
+    if (c.over === "win") {
+      box.appendChild(h("p", { class: "ok", text: e.mort ? genre(e.mort, P.setup.genre) : "Victoire." }));
+      box.appendChild(is.victoire ? h("button", { class: "pv-choice", onclick: function () { go(is.victoire); } }, "Continuer") : h("p", { class: "ko", text: "Aucun passage n'est relié à la victoire." }));
+    } else if (!c.over) {
+      box.appendChild(h("div", { class: "cb-intent", text: genre(c.revealed ? c.said : c.veilSaid, P.setup.genre) }));
+      if (tuto) box.appendChild(h("div", { class: "hint", html: "<b>" + INTENTS[c.it] + "</b> · aides affichées : combat d'apprentissage" }));
+      var t = targetsFor(c, e, w, tuto);
+      var acts = h("div", { class: "cb-acts" });
+      function btn(a, l, sub, dis) { acts.appendChild(h("button", { disabled: dis ? "disabled" : null, onclick: function () { combatAct(a, is); } }, l, h("small", { text: sub }))); }
+      btn("frapper", "Frapper", STATS[w.atk] + " · " + t.frapper);
+      btn("esquiver", "Esquiver", "Habileté · " + t.esquiver);
+      btn("parer", "Parer", "Force · " + (t.parer === null ? "impossible" : t.parer));
+      btn("prudente", "Garde prudente", "moitié des dégâts");
+      btn("observer", "Observer", c.observed ? "déjà tenté" : !e.voile ? "inutile ici" : "Sagesse · " + eff("sag"), c.observed || !e.voile);
+      P.mots.forEach(function (mid) { var m = D.mots[mid]; if (!m || m.effet === "recit") return; btn("mot:" + mid, m.nom, (m.cout || 0) + " Mana"); });
+      box.appendChild(acts);
+    }
+    var log = h("ol", { class: "cb-log", "aria-live": "polite" });
+    c.log.forEach(function (l) { log.appendChild(h("li", { html: l })); });
+    box.appendChild(log);
+    return box;
+  }
+  function targetsFor(c, e, w, tuto) {
+    var s = P.s, it = c.it;
+    var t = { frapper: eff(w.atk) - (+e.def || 0), esquiver: eff("hab") - (+e.menace || 0), parer: eff("for") - (+e.menace || 0) + w.parade };
+    if (tuto) {
+      if (it === "garde") t.frapper += 3;
+      if (it === "rapides" || it === "incant") t.esquiver -= 3;
+      if (it === "lourd") t.parer -= 5;
+      if (it === "incant") t.parer = null;
+    }
+    return t;
+  }
+  function combatAct(a, is) {
+    var c = P.combat, e = foeDef(c.eid), w = weapon(), s = P.s, it = c.it, L = [];
+    var real = targetsFor(c, e, w, true);
+    function die(r, ok) { return '<span class="die ' + (ok ? "ok" : "ko") + '">' + r + "</span>"; }
+    function test(target, label) { var r = rnd(20), ok = target !== null && r <= target; L.push(die(r, ok) + label + " (" + r + (ok ? " ≤ " : " > ") + (target === null ? "—" : target) + ")"); return ok; }
+    function foeHit() {
+      if (it === "incant") return roll(parseDice(e.sort || "2d4+2"));
+      return Math.max(0, roll(parseDice(e.degats || "1d6")) + (it === "lourd" ? 3 : 0) - w.armure);
+    }
+    function hurt(n, half) { if (half) n = Math.ceil(n / 2); s.vig = Math.max(0, s.vig - n); L.push('<span class="ko">−' + n + " Vigueur</span>"); }
+    function strike(mult, bonus, label) {
+      var ok = test(eff(w.atk) - (+e.def || 0) + (bonus || 0), label);
+      if (ok) { var d = roll(w.dmg) * (mult || 1); c.vig = Math.max(0, c.vig - d); L.push('<span class="ok">touché, −' + d + (mult > 1 ? " (double)" : "") + "</span>"); }
+      return ok;
+    }
+    if (a === "observer") {
+      c.observed = true;
+      if (test(eff("sag"), "Tu observes")) { c.revealed = true; L.push("Tu lis son geste : " + INTENTS[it].toLowerCase() + "."); }
+      else L.push("Tu ne lis rien.");
+      c.log.unshift("<b>Tour " + c.turn + "</b> · " + L.join(" "));
+      refresh(); return;
+    }
+    if (a.indexOf("mot:") === 0) {
+      var m = D.mots[a.slice(4)], cost = +m.cout || 0, fromMana = Math.min(s.man, cost), rest = cost - fromMana;
+      s.man -= fromMana; P.usure += rest;
+      L.push('<span class="mag">' + esc(m.nom) + " (−" + fromMana + " Mana" + (rest ? ", +" + rest + " Usure" : "") + ")</span>");
+      if (m.effet === "annule") L.push("L'action ennemie est annulée.");
+      else {
+        if (m.effet === "degats") { var d = roll(parseDice(m.valeur || "2d6")); c.vig = Math.max(0, c.vig - d); L.push('<span class="ok">−' + d + "</span>"); }
+        if (m.effet === "soin") { var hl = roll(parseDice(m.valeur || "1d6")); s.vig = Math.min(eff("vigMax"), s.vig + hl); L.push('<span class="ok">+' + hl + " Vigueur</span>"); }
+        if (c.vig > 0 && it !== "garde") hurt(foeHit());
+      }
+    } else if (a === "frapper") {
+      if (it === "lourd") { strike(1, 0, "Tu frappes en premier"); if (c.vig > 0) hurt(foeHit()); }
+      else if (it === "rapides") { strike(1, 0, "Échange de coups"); if (c.vig > 0) hurt(foeHit()); }
+      else if (it === "garde") { strike(1, 3, "Tu frappes sa garde ouverte"); }
+      else { if (strike(1, 0, "Tu frappes pour briser le sort")) L.push("Le sort se dissipe."); else if (c.vig > 0) hurt(foeHit()); }
+    } else if (a === "esquiver") {
+      if (it === "garde") L.push("Il ne frappait pas : tour perdu.");
+      else if (test(real.esquiver, "Tu esquives")) { if (it === "lourd") strike(2, 0, "Contre-attaque"); }
+      else hurt(foeHit());
+    } else if (a === "parer") {
+      if (it === "garde") L.push("Il ne frappait pas : tour perdu.");
+      else if (it === "incant") { L.push("On ne pare pas la thanergie."); hurt(foeHit()); }
+      else { var ok = test(real.parer, "Tu pares"); if (ok && it === "lourd") hurt(foeHit(), true); else if (!ok) hurt(foeHit()); }
+    } else if (a === "prudente") {
+      if (it === "garde") L.push("Il ne frappait pas : tour perdu.");
+      else { L.push("Garde prudente."); hurt(foeHit(), true); }
+    }
+    c.log.unshift("<b>Tour " + c.turn + " · " + INTENTS[it] + "</b> · " + L.join(" "));
+    if (c.vig <= 0) c.over = "win";
+    else if (s.vig <= 0) c.over = "lose";
+    else {
+      c.idx++; c.turn++;
+      if (c.phase === 1 && lines(String(e.cycle2 || "").replace(/,/g, "\n")).length && c.vig <= c.max / 2) {
+        c.phase = 2; c.idx = 0;
+        c.log.unshift('<span class="mag">' + esc(genre(e.phase || "Il change de rythme.", P.setup.genre)) + "</span>");
+      }
+      newTurn(c);
+    }
+    refresh();
+    function refresh() { var el = document.getElementById("previewBox"); el.replaceWith(previewPanel()); }
+  }
+
+  /* =====================================================================
+     Graphe
+     ===================================================================== */
+  var GV = null, zoomBy = function () {};
+  function viewGraph() {
+    var box = h("section", { class: "box graph-box" });
+    UI.gDir = UI.gDir || "LR";
+    if (UI.gLabels === undefined) UI.gLabels = true;
+    var tools = h("div", { class: "graph-tools" },
+      h("label", { class: "f inline" }, "Acte", selectEl([["tous", "Tous"], ["1", "Acte I"], ["2", "Acte II"], ["3", "Acte III"], ["0", "Sans acte"]], UI.gActe || "tous", function (v) { UI.gActe = v; GV = null; render(); })),
+      h("div", { class: "seg", role: "group", "aria-label": "Sens du graphe" },
+        h("button", { "aria-pressed": UI.gDir === "LR" ? "true" : "false", onclick: function () { UI.gDir = "LR"; GV = null; render(); } }, "Horizontal"),
+        h("button", { "aria-pressed": UI.gDir === "TB" ? "true" : "false", onclick: function () { UI.gDir = "TB"; GV = null; render(); } }, "Vertical")),
+      h("label", { class: "f inline" }, h("input", { type: "checkbox", checked: UI.gLabels, onchange: function (e) { UI.gLabels = e.target.checked; GV = null; render(); } }), "Texte des choix"),
+      h("div", { class: "toolbar" },
+        h("button", { class: "btn small", title: "Zoom avant", "aria-label": "Zoom avant", onclick: function () { zoomBy(1.25); } }, "+"),
+        h("button", { class: "btn small", title: "Zoom arrière", "aria-label": "Zoom arrière", onclick: function () { zoomBy(0.8); } }, "−"),
+        h("button", { class: "btn small", onclick: function () { GV = null; UI.gFocus = null; render(); } }, "Recentrer")),
+      h("div", { class: "graph-legend", html:
+        '<span><i style="border-color:var(--muted)"></i>choix</span><span><i class="dash" style="border-color:var(--muted)"></i>choix sous condition</span>' +
+        '<span><i style="border-color:var(--good)"></i>réussite / victoire</span><span><i style="border-color:var(--bad)"></i>échec</span>' +
+        '<span><b class="sw" style="border-color:var(--ivory)"></b>fin</span><span><b class="sw" style="border-color:var(--bad);border-style:dashed"></b>erreur</span>' }));
+    box.appendChild(tools);
+    if (typeof dagre === "undefined") { box.appendChild(h("p", { class: "empty", text: "Le module de mise en page du graphe n'a pas pu se charger. Recharge la page." })); return box; }
+    var ps = sortedPassages().filter(function (p) { return !UI.gActe || UI.gActe === "tous" || String(p.acte || "0") === UI.gActe; });
+    if (!ps.length) { box.appendChild(h("p", { class: "empty", text: "Aucun passage à afficher." })); return box; }
+
+    var errs = {}; checks().forEach(function (i) { if (i.pid && i.lvl === "erreur") errs[i.pid] = (errs[i.pid] || []).concat(i.msg); });
+    var reach = null, dep = R().depart;
+    if (dep && D.passages[dep]) { reach = {}; var st = [dep]; while (st.length) { var x = st.pop(); if (reach[x] || !D.passages[x]) continue; reach[x] = 1; edges(D.passages[x]).forEach(function (y) { st.push(y); }); } }
+
+    var g = new dagre.graphlib.Graph({ multigraph: true });
+    g.setGraph({ rankdir: UI.gDir, nodesep: 22, ranksep: UI.gLabels ? 90 : 60, edgesep: 10, marginx: 30, marginy: 30 });
+    g.setDefaultEdgeLabel(function () { return {}; });
+    var inSet = {}; ps.forEach(function (p) { inSet[p.id] = 1; });
+    var NW = 168, NH = 56;
+    ps.forEach(function (p) { g.setNode(p.id, { width: NW, height: NH, p: p }); });
+    var k = 0;
+    function link(src, tgt, kind, label, cond) {
+      if (!tgt) return;
+      if (!inSet[tgt]) {
+        var sid = "stub:" + tgt;
+        if (!g.hasNode(sid)) g.setNode(sid, { width: 64, height: 30, stub: tgt });
+        tgt = sid;
+      }
+      var lbl = UI.gLabels && label ? (label.length > 26 ? label.slice(0, 25) + "…" : label) : "";
+      g.setEdge(src, tgt, { kind: kind, cond: cond, label: lbl, width: lbl ? Math.min(170, lbl.length * 6.2 + 8) : 0, height: lbl ? 16 : 0, labelpos: "c" }, "e" + (k++));
+    }
+    ps.forEach(function (p) {
+      var is = p.issue || {};
+      if (is.type === "choix") (is.choix || []).forEach(function (c) { link(p.id, c.cible, "choix", genre(c.texte || "", "m"), (c.cond || []).length > 0); });
+      if (is.type === "test") { link(p.id, is.succes, "ok", "réussite"); link(p.id, is.echec, "ko", "échec"); }
+      if (is.type === "combat") link(p.id, is.victoire, "ok", "victoire");
+    });
+    dagre.layout(g);
+    var gw = g.graph().width || 400, gh = g.graph().height || 300;
+
+    var H = Math.max(420, window.innerHeight - 190);
+    var svgNS = "http://www.w3.org/2000/svg";
+    var parts = [];
+    parts.push('<defs>' + ["muted", "good", "bad"].map(function (c) { return '<marker id="ga-' + c + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--' + c + ')"/></marker>'; }).join("") + '</defs>');
+    parts.push('<g class="gview">');
+    g.edges().forEach(function (e) {
+      var ed = g.edge(e), pts = ed.points || [];
+      if (!pts.length) return;
+      var d = "M" + pts[0].x + " " + pts[0].y;
+      for (var i = 1; i < pts.length - 1; i++) { var mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2; d += " Q" + pts[i].x + " " + pts[i].y + " " + (i === pts.length - 2 ? pts[i + 1].x + " " + pts[i + 1].y : mx + " " + my); }
+      if (pts.length === 2) d += " L" + pts[1].x + " " + pts[1].y;
+      var col = ed.kind === "ok" ? "good" : ed.kind === "ko" ? "bad" : "muted";
+      parts.push('<path d="' + d + '" fill="none" stroke="var(--' + col + ')" stroke-width="1.4"' + (ed.cond ? ' stroke-dasharray="5 4"' : "") + ' marker-end="url(#ga-' + col + ')" opacity=".85"/>');
+      if (ed.label) parts.push('<text x="' + ed.x + '" y="' + (ed.y + 4) + '" text-anchor="middle" font-size="11" fill="var(--muted)" paint-order="stroke" stroke="var(--panel-2)" stroke-width="4" stroke-linejoin="round">' + esc(ed.label) + "</text>");
+    });
+    g.nodes().forEach(function (id) {
+      var n = g.node(id);
+      if (n.stub) {
+        var sp = D.passages[n.stub];
+        parts.push('<g class="gn" data-id="' + esc(n.stub) + '"><rect x="' + (n.x - 32) + '" y="' + (n.y - 15) + '" width="64" height="30" rx="15" fill="var(--panel)" stroke="var(--line)" stroke-dasharray="3 3"/><text x="' + n.x + '" y="' + (n.y + 4) + '" text-anchor="middle" font-size="12" fill="var(--muted)">→ ' + esc(sp ? sp.num : "?") + "</text><title>Passage d'un autre acte</title></g>");
+        return;
+      }
+      var p = n.p, is = p.issue || {}, x0 = n.x - NW / 2, y0 = n.y - NH / 2;
+      var err = errs[p.id], unreach = reach && !reach[p.id], st = p.statut || "afaire";
+      var stroke = err ? "var(--bad)" : is.type === "fin" ? "var(--ivory)" : UI.gFocus === p.id || UI.sel === p.id ? "var(--accent)" : "var(--line)";
+      var sw = err || is.type === "fin" || UI.gFocus === p.id || UI.sel === p.id ? 2 : 1.2;
+      var fill = is.type === "fin" ? (is.fin === "Mort" || is.fin === "Échec" ? "color-mix(in srgb, var(--bad) 10%, var(--panel))" : "color-mix(in srgb, var(--ivory) 12%, var(--panel))") : "var(--panel)";
+      var kind = is.type === "test" ? "test " + (STATS[is.stat] || "").toLowerCase() : is.type === "combat" ? "combat" : is.type === "fin" ? (is.fin || "fin").toLowerCase() : "";
+      var ttl = p.titre || firstWords(p) || "Sans titre";
+      if (ttl.length > 24) ttl = ttl.slice(0, 23) + "…";
+      var dot = { afaire: "var(--line)", brouillon: "var(--warn)", ecrit: "var(--good)", relu: "var(--accent)" }[st];
+      parts.push('<g class="gn" data-id="' + esc(p.id) + '"' + (unreach ? ' opacity=".45"' : "") + ">" +
+        '<rect class="card-bg" x="' + x0 + '" y="' + y0 + '" width="' + NW + '" height="' + NH + '" rx="7" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"' + (err ? ' stroke-dasharray="5 3"' : "") + "/>" +
+        (p.id === dep ? '<rect x="' + (x0 - 4) + '" y="' + (y0 - 4) + '" width="' + (NW + 8) + '" height="' + (NH + 8) + '" rx="10" fill="none" stroke="var(--accent)" stroke-width="1.2"/>' : "") +
+        '<circle cx="' + (x0 + NW - 11) + '" cy="' + (y0 + 11) + '" r="4" fill="' + dot + '"/>' +
+        '<text class="gnum" x="' + (x0 + 10) + '" y="' + (y0 + 23) + '" font-size="19" fill="var(--ivory)">' + esc(p.num || "?") + "</text>" +
+        (kind ? '<text x="' + (x0 + NW - 20) + '" y="' + (y0 + 16) + '" text-anchor="end" font-size="10.5" fill="var(--muted)" letter-spacing=".04em">' + esc(kind) + "</text>" : "") +
+        (p.debutActe ? '<text x="' + (x0 + NW - 20) + '" y="' + (y0 + 28) + '" text-anchor="end" font-size="10.5" fill="var(--accent)">sauvegarde</text>' : "") +
+        '<text x="' + (x0 + 10) + '" y="' + (y0 + 44) + '" font-size="12.5" fill="var(--fg)">' + esc(ttl) + "</text>" +
+        "<title>" + esc((p.num || "?") + " · " + (p.titre || "") + (err ? "\n" + err.join("\n") : "") + (unreach ? "\nInaccessible depuis le départ" : "")) + "</title></g>");
+    });
+    parts.push("</g>");
+
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("class", "graph-svg");
+    svg.setAttribute("height", H);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Graphe des passages : " + ps.length + " passages");
+    svg.innerHTML = parts.join("");
+    box.appendChild(svg);
+    box.appendChild(h("div", { class: "graph-hint", text: "Molette : zoom · glisser : se déplacer · clic sur un passage : l'ouvrir. Pastille : statut (gris à écrire, ocre brouillon, vert écrit, vert-de-gris relu). Les passages estompés sont inaccessibles depuis le départ." }));
+
+    var view = svg.querySelector(".gview");
+    setTimeout(function () {
+      var W = svg.clientWidth || 900;
+      if (!GV) {
+        var kfit = Math.min(1.1, W / gw, H / gh);
+        if (kfit >= 0.7) GV = { k: kfit, x: (W - gw * kfit) / 2, y: (H - gh * kfit) / 2 };
+        else {
+          var anchor = dep && g.hasNode(dep) ? g.node(dep) : null;
+          if (!anchor) g.nodes().forEach(function (id) { var n = g.node(id); if (!anchor || (UI.gDir === "LR" ? n.x < anchor.x : n.y < anchor.y)) anchor = n; });
+          GV = { k: 0.85 };
+          if (UI.gDir === "LR") { GV.x = 40 - (anchor.x - NW / 2) * GV.k; GV.y = H / 2 - anchor.y * GV.k; }
+          else { GV.x = W / 2 - anchor.x * GV.k; GV.y = 40 - (anchor.y - NH / 2) * GV.k; }
+        }
+        if (UI.gFocus && g.hasNode(UI.gFocus)) { var fn = g.node(UI.gFocus); GV.k = 1; GV.x = W / 2 - fn.x; GV.y = H / 2 - fn.y; }
+      }
+      apply();
+    }, 0);
+    function apply() { view.setAttribute("transform", "translate(" + GV.x + " " + GV.y + ") scale(" + GV.k + ")"); }
+    zoomBy = function (f) { if (!GV) return; var W = svg.clientWidth, cx = W / 2, cy = H / 2, nk = Math.max(0.15, Math.min(2.5, GV.k * f)); GV.x = cx - (cx - GV.x) * nk / GV.k; GV.y = cy - (cy - GV.y) * nk / GV.k; GV.k = nk; apply(); };
+    svg.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      var r = svg.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+      var nk = Math.max(0.15, Math.min(2.5, GV.k * Math.exp(-e.deltaY * 0.0015)));
+      GV.x = mx - (mx - GV.x) * nk / GV.k; GV.y = my - (my - GV.y) * nk / GV.k; GV.k = nk; apply();
+    }, { passive: false });
+    var drag = null;
+    svg.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, y: e.clientY, gx: GV.x, gy: GV.y, moved: false, target: e.target }; svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) { drag.moved = true; svg.classList.add("dragging"); }
+      if (drag.moved) { GV.x = drag.gx + dx; GV.y = drag.gy + dy; apply(); }
+    });
+    svg.addEventListener("pointerup", function () {
+      if (drag && !drag.moved) {
+        var gn = drag.target.closest && drag.target.closest(".gn");
+        if (gn) { UI.sel = gn.getAttribute("data-id"); UI.gFocus = UI.sel; UI.view = "passages"; renderTabs(); render(); }
+      }
+      drag = null; svg.classList.remove("dragging");
+    });
+    return box;
+  }
+
+  /* =====================================================================
+     Vérifications
+     ===================================================================== */
+  function edges(p) {
+    var is = p.issue || {}, out = [];
+    if (is.type === "choix") (is.choix || []).forEach(function (c) { if (c.cible) out.push(c.cible); });
+    if (is.type === "test") { if (is.succes) out.push(is.succes); if (is.echec) out.push(is.echec); }
+    if (is.type === "combat" && is.victoire) out.push(is.victoire);
+    return out;
+  }
+  function checks() {
+    var out = [], ps = sortedPassages();
+    function add(lvl, p, msg) { out.push({ lvl: lvl, pid: p ? p.id : null, num: p ? p.num : "", msg: msg }); }
+    var given = { objets: {}, mots: {}, infos: {} };
+    function scanFx(list) { (list || []).forEach(function (f) { if (f.type === "donner") given.objets[f.val] = 1; if (f.type === "mot") given.mots[f.val] = 1; if (f.type === "info") given.infos[f.val] = 1; }); }
+    ps.forEach(function (p) { scanFx(p.effets); (p.segments || []).forEach(function (sg) { scanFx(sg.effets); }); ((p.issue || {}).choix || []).forEach(function (c) { scanFx(c.effets); }); });
+    var nums = {};
+    ps.forEach(function (p) {
+      if (!p.num) add("erreur", p, "Passage sans numéro.");
+      else if (nums[p.num]) add("erreur", p, "Numéro " + p.num + " utilisé deux fois.");
+      nums[p.num] = 1;
+      var is = p.issue || {};
+      var hasText = (p.segments || []).some(function (s) { return String(s.texte || "").trim(); });
+      if (!hasText) add("attention", p, "Pas encore de texte.");
+      if (neutreOn()) {
+        var miss = (p.segments || []).reduce(function (n, sg) { return n + missingNeutral(sg.texte); }, 0) + ((p.issue || {}).choix || []).reduce(function (n, c) { return n + missingNeutral(c.texte); }, 0);
+        if (miss) add("attention", p, miss + " accord(s) sans forme neutre, comme {il|elle} : au neutre, la forme masculine s'affichera.");
+      }
+      else { var wn = String((p.segments[0] || {}).texte || "").trim().split(/\s+/).length; if (wn > 350) add("attention", p, "Texte principal long : " + wn + " mots (cible 100 à 300)."); }
+      if (is.type === "choix") {
+        if (!(is.choix || []).length) add("erreur", p, "Impasse : aucun choix, et ce n'est pas une fin.");
+        else if ((is.choix || []).every(function (c) { return (c.cond || []).length; })) add("attention", p, "Tous les choix sont conditionnels : risque d'impasse.");
+        (is.choix || []).forEach(function (c, i) {
+          if (!c.cible) add("erreur", p, "Le choix " + (i + 1) + " ne mène nulle part.");
+          else if (!D.passages[c.cible]) add("erreur", p, "Le choix " + (i + 1) + " mène à un passage supprimé.");
+          if (!String(c.texte || "").trim()) add("attention", p, "Le choix " + (i + 1) + " n'a pas de texte.");
+        });
+      } else if (is.type === "test") {
+        if (!is.succes || !D.passages[is.succes]) add("erreur", p, "Le test n'a pas de passage pour la réussite.");
+        if (!is.echec || !D.passages[is.echec]) add("erreur", p, "Le test n'a pas de passage pour l'échec.");
+      } else if (is.type === "combat") {
+        if (!is.ennemi || !D.ennemis[is.ennemi]) add("erreur", p, "Combat sans ennemi.");
+        if (!is.victoire || !D.passages[is.victoire]) add("erreur", p, "Le combat n'a pas de passage pour la victoire.");
+      } else if (is.type !== "fin") add("erreur", p, "Pas d'issue.");
+      function scanCond(list, where) {
+        (list || []).forEach(function (c) {
+          if (c.type === "objet" && c.val && !given.objets[c.val]) add("erreur", p, where + " demande « " + (D.objets[c.val] ? D.objets[c.val].nom : "?") + " », que rien ne donne.");
+          if (c.type === "mot" && c.val && !given.mots[c.val]) add("erreur", p, where + " demande le « " + (D.mots[c.val] ? D.mots[c.val].nom : "?") + " », que rien n'apprend.");
+          if (c.type === "info" && c.val && !given.infos[c.val]) add("erreur", p, where + " demande l'information « " + (D.infos[c.val] ? D.infos[c.val].nom : "?") + " », que rien ne donne.");
+          if (["objet", "sansobjet", "mot", "info", "sansinfo", "origine", "occupation", "visite"].indexOf(c.type) >= 0 && !c.val) add("attention", p, where + " a une condition incomplète.");
+        });
+      }
+      (p.segments || []).forEach(function (s, i) { if (i > 0) scanCond(s.cond, "Un bloc conditionnel"); });
+      ((p.issue || {}).choix || []).forEach(function (c, i) { scanCond(c.cond, "Le choix " + (i + 1)); });
+    });
+    var dep = R().depart;
+    var acts = {}; ps.forEach(function (p) { if (p.debutActe) acts[String(p.acte || "0")] = 1; });
+    ["1", "2", "3"].forEach(function (a) { if (ps.some(function (p) { return String(p.acte) === a; }) && !acts[a]) add("attention", null, "L'acte " + ["", "I", "II", "III"][+a] + " n'a pas de passage « début d'acte » : pas de sauvegarde pour cet acte."); });
+    if (!dep || !D.passages[dep]) { if (ps.length) add("attention", null, "Aucun passage de départ n'est défini (onglet Réglages) : impossible de repérer les passages inaccessibles."); }
+    else {
+      var seen = {}, stack = [dep];
+      while (stack.length) { var id = stack.pop(); if (seen[id] || !D.passages[id]) continue; seen[id] = 1; edges(D.passages[id]).forEach(function (x) { stack.push(x); }); }
+      ps.forEach(function (p) { if (!seen[p.id]) add("attention", p, "Inaccessible depuis le passage de départ."); });
+    }
+    return out.sort(function (a, b) { return (a.lvl === "erreur" ? 0 : 1) - (b.lvl === "erreur" ? 0 : 1); });
+  }
+  function viewChecks() {
+    var wrap = h("section", { class: "box" });
+    var ps = sortedPassages(), list = checks();
+    var words = ps.reduce(function (n, p) { return n + (p.segments || []).reduce(function (m, s) { return m + (String(s.texte || "").trim() ? String(s.texte).trim().split(/\s+/).length : 0); }, 0); }, 0);
+    var byStatus = {}; ps.forEach(function (p) { var k = p.statut || "afaire"; byStatus[k] = (byStatus[k] || 0) + 1; });
+    var fins = ps.filter(function (p) { return p.issue && p.issue.type === "fin"; }).length;
+    wrap.appendChild(h("div", { class: "box-h" }, h("h2", { text: "Vérifications" }), h("span", { class: "hint", text: "Recalculées à chaque ouverture de l'onglet" })));
+    var b = h("div", { class: "box-b" });
+    b.appendChild(h("div", { class: "kpis", html:
+      "<span><b>" + ps.length + "</b>passages</span><span><b>" + words.toLocaleString("fr-FR") + "</b>mots écrits</span><span><b>" + fins + "</b>fins</span>" +
+      Object.keys(STATUTS).map(function (k) { return "<span><b>" + (byStatus[k] || 0) + "</b>" + STATUTS[k].toLowerCase() + "</span>"; }).join("") }));
+    if (!list.length) b.appendChild(h("p", { class: "ok", text: "Aucun problème détecté." }));
+    else {
+      var ul = h("ul", { class: "issues" });
+      list.forEach(function (i) {
+        ul.appendChild(h("li", null, h("span", { class: "lvl " + i.lvl, text: i.lvl }),
+          i.pid ? h("button", { class: "btn link", onclick: function () { UI.sel = i.pid; UI.view = "passages"; renderTabs(); render(); } }, i.num || "?") : h("span", { text: "—" }),
+          h("span", { text: i.msg })));
+      });
+      b.appendChild(ul);
+    }
+    wrap.appendChild(b);
+    return wrap;
+  }
+
+  /* =====================================================================
+     Catalogues : ennemis, objets, Mots, informations
+     ===================================================================== */
+  var SCHEMAS = {
+    ennemis: { titre: "Ennemis", un: "un ennemi", fields: [
+      ["nom", "Nom", "text"], ["def", "Défense (malus à tes frappes)", "number"], ["menace", "Menace (malus à tes esquives et parades)", "number"],
+      ["vig", "Vigueur", "number"], ["degats", "Dégâts (ex. : 1d6+1)", "text"], ["sort", "Dégâts de l'incantation (ignore l'armure)", "text"],
+      ["voile", "Intentions voilées (Ordre et boss)", "bool"], ["tutoriel", "Combat d'apprentissage : aides affichées", "bool"],
+      ["cycle1", "Cycle (ex. : lourd, rapides, garde)", "text"], ["cycle2", "Cycle de seconde phase, à mi-Vigueur (facultatif)", "text"],
+      ["ph_lourd", "Phrases du coup lourd (une par ligne)", "area"], ["ph_rapides", "Phrases des coups rapides", "area"],
+      ["ph_garde", "Phrases de la garde basse", "area"], ["ph_incant", "Phrases de l'incantation", "area"],
+      ["voile_a", "Postures voilées : coup lourd OU coups rapides", "area"], ["voile_b", "Postures voilées : garde basse OU incantation", "area"],
+      ["phase", "Phrase du changement de phase", "area"], ["mort", "Phrase de mort", "area"], ["notes", "Notes", "area"]
+    ] },
+    objets: { titre: "Objets", un: "un objet", fields: [
+      ["nom", "Nom", "text"], ["categorie", "Catégorie", "catsel"], ["desc", "Description", "area"], ["poids", "Poids (Capacité de port)", "number"], ["consommable", "Consommable", "bool"],
+      ["effet_stat", "Effet à l'utilisation", "statsel"], ["effet_val", "Valeur de l'effet", "number"],
+      ["arme_degats", "Arme : dégâts (ex. : 1d6+2)", "text"], ["arme_attaque", "Arme : caractéristique d'attaque", "atksel"],
+      ["bonus_armure", "Équipé : bonus d'armure", "number"], ["bonus_parade", "Équipé : bonus de parade", "number"],
+      ["bonus_stat", "Équipé : caractéristique améliorée", "bonussel"], ["bonus_val", "Équipé : valeur du bonus", "number"],
+      ["notes", "Notes", "area"]
+    ] },
+    mots: { titre: "Mots", un: "un Mot", fields: [
+      ["nom", "Nom (ex. : Mot de Pierre)", "text"], ["cout", "Coût en Mana", "number"],
+      ["effet", "Effet en combat", "motsel"], ["valeur", "Valeur (dés ou nombre, ex. : 2d6)", "text"],
+      ["desc", "Description (ce que le Mot fait dans le récit)", "area"], ["notes", "Notes", "area"]
+    ] },
+    infos: { titre: "Informations", un: "une information", fields: [
+      ["nom", "Nom court (ex. : Le vrai nom de Mognus)", "text"], ["desc", "Ce que le joueur a appris", "area"], ["notes", "Notes", "area"]
+    ] }
+  };
+  function viewCatalog(col) {
+    var sc = SCHEMAS[col], wrap = h("div", { class: "cat" });
+    var list = catList(col);
+    var side = h("aside", { class: "box sticky" });
+    side.appendChild(h("div", { class: "list-tools" }, h("button", { class: "btn primary", onclick: function () {
+      var id = uid(col.slice(0, 2)); D[col][id] = { id: id, nom: "" }; if (col === "ennemis") Object.assign(D[col][id], { def: 2, menace: 1, vig: 12, degats: "1d6+1", cycle1: "lourd, rapides, garde" });
+      UI.catSel[col] = id; saveLater(col, id); renderTabs(); render(); } }, "+ Ajouter " + sc.un)));
+    var ul = h("ul", { class: "plist" });
+    list.forEach(function (x) {
+      ul.appendChild(h("li", null, h("button", { style: "grid-template-columns:minmax(0,1fr) auto", "aria-current": UI.catSel[col] === x.id ? "true" : null, onclick: function () { UI.catSel[col] = x.id; UI.confirmDel = false; render(); } },
+        h("span", { class: "ttl", text: x.nom || "(sans nom)" }), h("span", { class: "flag", text: usageCount(col, x.id) + " util." }))));
+    });
+    if (!list.length) ul.appendChild(h("li", { class: "empty", text: "Aucun élément." }));
+    side.appendChild(ul);
+    wrap.appendChild(side);
+    var cur = D[col][UI.catSel[col]];
+    var main = h("section", { class: "box" });
+    if (!cur) { main.appendChild(h("div", { class: "empty", text: "Choisis un élément ou ajoutes-en un." })); wrap.appendChild(main); return wrap; }
+    function touch() { saveLater(col, cur.id); }
+    main.appendChild(h("div", { class: "box-h" }, h("h2", { text: cur.nom || "(sans nom)" }),
+      UI.confirmDel ? h("span", { class: "confirm" }, "Supprimer ?", h("button", { class: "btn small danger", onclick: function () { delete D[col][cur.id]; deleteDoc(col + "/" + cur.id); UI.catSel[col] = null; UI.confirmDel = false; renderTabs(); render(); } }, "Oui"), h("button", { class: "btn small", onclick: function () { UI.confirmDel = false; render(); } }, "Annuler"))
+        : h("button", { class: "btn small danger", onclick: function () { UI.confirmDel = true; render(); } }, "Supprimer")));
+    var b = h("div", { class: "box-b" });
+    var where = usageWhere(col, cur.id);
+    if (where.length) b.appendChild(h("div", { class: "toolbar" }, h("span", { class: "hint", text: "Utilisé dans les passages :" }),
+      where.map(function (pid) { return h("button", { class: "btn small", onclick: function () { UI.sel = pid; UI.view = "passages"; renderTabs(); render(); } }, D.passages[pid].num || "?"); })));
+    else b.appendChild(h("span", { class: "hint", text: "Utilisé dans aucun passage pour l'instant." }));
+    var grid = h("div", { class: "grid2" });
+    sc.fields.forEach(function (f) {
+      var k = f[0], el;
+      if (col === "objets") {
+        var cat = cur.categorie || "divers";
+        if ((k === "arme_degats" || k === "arme_attaque") && cat !== "arme") return;
+        if (k.indexOf("bonus_") === 0 && cat === "divers") return;
+      }
+      if (f[2] === "text") el = h("input", { type: "text", value: cur[k] || "", oninput: function (e) { cur[k] = e.target.value; touch(); if (k === "nom") main.querySelector("h2").textContent = e.target.value || "(sans nom)"; } });
+      else if (f[2] === "number") el = h("input", { type: "number", value: cur[k] == null ? "" : cur[k], oninput: function (e) { cur[k] = e.target.value === "" ? null : +e.target.value; touch(); } });
+      else if (f[2] === "area") el = h("textarea", { value: cur[k] || "", oninput: function (e) { cur[k] = e.target.value; touch(); } });
+      else if (f[2] === "bool") el = h("input", { type: "checkbox", checked: !!cur[k], onchange: function (e) { cur[k] = e.target.checked; touch(); } });
+      else if (f[2] === "statsel") el = selectEl([["", "aucun"]].concat(Object.keys(STATS).map(function (s) { return [s, STATS[s]]; })), cur[k] || "", function (v) { cur[k] = v; touch(); });
+      else if (f[2] === "catsel") el = selectEl([["divers", "Divers"], ["arme", "Arme (s'équipe)"], ["armure", "Armure (s'équipe)"], ["talisman", "Talisman (s'équipe)"]], cur[k] || "divers", function (v) { cur[k] = v; touch(); render(); });
+      else if (f[2] === "atksel") el = selectEl([["for", "Force"], ["hab", "Habileté"]], cur[k] || "for", function (v) { cur[k] = v; touch(); });
+      else if (f[2] === "bonussel") el = selectEl([["", "aucune"], ["for", "Force"], ["hab", "Habileté"], ["sag", "Sagesse"], ["cha", "Chance"], ["vigMax", "Vigueur maximum"], ["manMax", "Mana maximum"]], cur[k] || "", function (v) { cur[k] = v; touch(); });
+      else if (f[2] === "motsel") el = selectEl([["annule", "Annule l'action de l'ennemi"], ["degats", "Inflige des dégâts (ignore la Défense)"], ["soin", "Rend de la Vigueur"], ["recit", "Aucun : seulement dans le récit"]], cur[k] || "recit", function (v) { cur[k] = v; touch(); });
+      var wide = f[2] === "area";
+      grid.appendChild(f[2] === "bool" ? h("label", { class: "f inline" }, el, f[1]) : h("label", { class: "f", style: wide ? "grid-column:1/-1" : null }, f[1], el));
+    });
+    b.appendChild(grid);
+    if (col === "ennemis") b.appendChild(h("details", { class: "help" }, h("summary", { text: "Rappel : le vocabulaire des intentions" }),
+      h("p", { text: "Coup lourd : lever, armer, à deux mains, prendre de l'élan. Coups rapides : enchaîner, coups secs, rapprochés, harceler. Garde basse : vaciller, chercher son équilibre, reprendre son souffle. Incantation : lueur, murmure, paume, thanergie qui s'accumule. Une posture voilée ne laisse jamais que deux possibilités." })));
+    main.appendChild(b);
+    wrap.appendChild(main);
+    return wrap;
+  }
+  function usageWhere(col, id) {
+    return sortedPassages().filter(function (p) {
+      var hit = false;
+      function scan(list) { (list || []).forEach(function (x) { if (x.val === id) hit = true; }); }
+      scan(p.effets);
+      (p.segments || []).forEach(function (sg) { scan(sg.cond); scan(sg.effets); });
+      var is = p.issue || {};
+      (is.choix || []).forEach(function (c) { scan(c.cond); scan(c.effets); });
+      if (is.ennemi === id) hit = true;
+      return hit;
+    }).map(function (p) { return p.id; });
+  }
+  function usageCount(col, id) {
+    var n = 0;
+    function scan(list) { (list || []).forEach(function (x) { if (x.val === id) n++; }); }
+    Object.keys(D.passages).forEach(function (k) {
+      var p = D.passages[k];
+      scan(p.effets);
+      (p.segments || []).forEach(function (s) { scan(s.cond); scan(s.effets); });
+      var is = p.issue || {};
+      (is.choix || []).forEach(function (c) { scan(c.cond); scan(c.effets); });
+      if (col === "ennemis" && is.ennemi === id) n++;
+    });
+    return n;
+  }
+
+  /* =====================================================================
+     Réglages
+     ===================================================================== */
+  function viewReglages() {
+    if (!D.reglages) D.reglages = clone(DEFAULT_REGLAGES);
+    var r = D.reglages;
+    function touch() { saveLater("reglages", "livre"); }
+    function rerender() { touch(); render(); }
+    var wrap = h("div", { class: "sec" });
+    var main = h("section", { class: "box" }, h("div", { class: "box-h" }, h("h2", { text: "Réglages du livre" })));
+    var b = h("div", { class: "box-b" });
+    b.appendChild(h("div", { class: "row" },
+      h("label", { class: "f grow" }, "Titre du livre", h("input", { type: "text", value: r.titre || "", oninput: function (e) { r.titre = e.target.value; touch(); } })),
+      h("label", { class: "f inline" }, h("input", { type: "checkbox", checked: r.neutre !== false, onchange: function (e) { r.neutre = e.target.checked; rerender(); } }), "Proposer le genre neutre (iel)"),
+      h("label", { class: "f" }, "Nom du héros si le joueur n'en donne pas", h("input", { type: "text", value: r.nomDefaut || "", placeholder: "Voyageur", oninput: function (e) { r.nomDefaut = e.target.value; touch(); } })),
+      h("label", { class: "f grow" }, "Passage de départ", selectEl(passageOpts("— aucun —"), r.depart || "", function (v) { r.depart = v; touch(); }))));
+    b.appendChild(h("div", { class: "row" },
+      h("span", { class: "hint", text: "Valeurs de départ pour l'aperçu (avant le bonus d'occupation) :" }),
+      ["for", "hab", "sag"].map(function (k) { return h("label", { class: "f inline" }, STATS[k], h("input", { type: "number", value: r.base[k], oninput: function (e) { r.base[k] = +e.target.value; touch(); } })); })));
+
+    b.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Origines" })));
+    var t1 = h("table", { class: "mini" }, h("thead", null, h("tr", null, h("th", { text: "Nom" }), h("th", { text: "Description" }), h("th", { text: "Effet en jeu" }), h("th"))));
+    var tb1 = h("tbody");
+    r.origines.forEach(function (o, i) {
+      tb1.appendChild(h("tr", null,
+        h("td", null, h("input", { type: "text", value: o.nom || "", oninput: function (e) { o.nom = e.target.value; touch(); } })),
+        h("td", null, h("textarea", { value: o.desc || "", oninput: function (e) { o.desc = e.target.value; touch(); } })),
+        h("td", null, h("textarea", { value: o.effet || "", oninput: function (e) { o.effet = e.target.value; touch(); } })),
+        h("td", null, h("button", { class: "x btn small danger", onclick: function () { r.origines.splice(i, 1); rerender(); } }, "Retirer"))));
+    });
+    t1.appendChild(tb1);
+    b.appendChild(h("div", { class: "tbl-wrap" }, t1));
+    b.appendChild(h("div", null, h("button", { class: "btn small", onclick: function () { r.origines.push({ nom: "", desc: "" }); rerender(); } }, "+ origine")));
+
+    b.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Occupations" })));
+    var t2 = h("table", { class: "mini" }, h("thead", null, h("tr", null, ["Nom", "Favorisées (+2)", "Arme", "Dégâts", "Attaque", "Armure", "Parade", ""].map(function (x) { return h("th", { text: x }); }))));
+    var tb2 = h("tbody");
+    r.occupations.forEach(function (o, i) {
+      o.fav = o.fav || [];
+      var favBox = h("div", { class: "mini-row" });
+      ["for", "hab", "sag", "vig", "man", "cp"].forEach(function (k) {
+        favBox.appendChild(h("label", { class: "f inline", style: "font-size:.78rem" }, h("input", { type: "checkbox", checked: o.fav.indexOf(k) >= 0, onchange: function (e) {
+          if (e.target.checked) o.fav.push(k); else o.fav = o.fav.filter(function (x) { return x !== k; }); touch(); } }), k === "cp" ? "Port" : STATS[k]));
+      });
+      tb2.appendChild(h("tr", null,
+        h("td", null, h("input", { type: "text", value: o.nom || "", oninput: function (e) { o.nom = e.target.value; touch(); } })),
+        h("td", null, favBox),
+        h("td", null, h("input", { type: "text", value: o.arme || "", oninput: function (e) { o.arme = e.target.value; touch(); } })),
+        h("td", null, h("input", { type: "text", value: o.degats || "", style: "width:5em", oninput: function (e) { o.degats = e.target.value; touch(); } })),
+        h("td", null, selectEl([["for", "Force"], ["hab", "Habileté"]], o.attaque || "for", function (v) { o.attaque = v; touch(); })),
+        h("td", null, h("input", { type: "number", value: o.armure || 0, oninput: function (e) { o.armure = +e.target.value; touch(); } })),
+        h("td", null, h("input", { type: "number", value: o.parade || 0, oninput: function (e) { o.parade = +e.target.value; touch(); } })),
+        h("td", null, h("button", { class: "btn small danger", onclick: function () { r.occupations.splice(i, 1); rerender(); } }, "Retirer"))));
+    });
+    t2.appendChild(tb2);
+    b.appendChild(h("div", { class: "tbl-wrap" }, t2));
+    b.appendChild(h("div", null, h("button", { class: "btn small", onclick: function () { r.occupations.push({ nom: "", fav: [], arme: "", degats: "1d6", attaque: "for", armure: 0, parade: 0 }); rerender(); } }, "+ occupation")));
+    main.appendChild(b);
+    wrap.appendChild(main);
+
+    /* Sauvegarde */
+    wrap.appendChild(publishBox(r, touch, rerender));
+    if (GH) wrap.appendChild(githubSettingsBox());
+
+    var bk = h("section", { class: "box" }, h("div", { class: "box-h" }, h("h2", { text: "Sauvegarde" })));
+    var bb = h("div", { class: "box-b" });
+    bb.appendChild(h("p", { class: "hint", text: "Ton livre est enregistré en ligne automatiquement. Pour garder une copie sur ton ordinateur, télécharge une sauvegarde de temps en temps. Elle sert aussi à restaurer le livre." }));
+    var msg = h("span", { class: "hint" });
+    bb.appendChild(h("div", { class: "mini-row" },
+      downloads ? h("button", { class: "btn", onclick: function () {
+        var dump = { version: 1, date: new Date().toISOString(), reglages: D.reglages };
+        COLS.forEach(function (c) { dump[c] = D[c]; });
+        var d = new Date(), name = "kepultum-sauvegarde-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".json";
+        downloads.save({ filename: name, data: JSON.stringify(dump, null, 2) }).then(function () { msg.textContent = "Sauvegarde téléchargée."; }, function (e) { msg.textContent = e && e.code === "declined" ? "Téléchargement annulé." : "Le téléchargement n'est pas disponible ici."; });
+      } }, "Télécharger une sauvegarde") : h("span", { class: "hint", text: "Le téléchargement n'est disponible que dans claude.ai." }),
+      downloads ? h("button", { class: "btn", onclick: function () { exportBook("m", msg); } }, "Livre en texte (masculin)") : null,
+      downloads ? h("button", { class: "btn", onclick: function () { exportBook("f", msg); } }, "Livre en texte (féminin)") : null,
+      downloads && neutreOn() ? h("button", { class: "btn", onclick: function () { exportBook("n", msg); } }, "Livre en texte (neutre)") : null,
+      h("label", { class: "btn", style: "display:inline-flex;gap:6px" }, "Restaurer une sauvegarde…", h("input", { type: "file", accept: "application/json,.json", style: "display:none", onchange: function (e) {
+        var f = e.target.files[0]; if (!f) return;
+        f.text().then(function (txt) {
+          var dump = JSON.parse(txt);
+          if (!dump || dump.version !== 1) throw new Error("format");
+          restoreDump = dump; msg.textContent = ""; render();
+        }).catch(function () { msg.textContent = "Ce fichier n'est pas une sauvegarde de l'atelier."; });
+      } })), msg));
+    if (restoreDump) {
+      bb.appendChild(h("div", { class: "card" },
+        h("strong", { text: "Restaurer la sauvegarde du " + new Date(restoreDump.date).toLocaleString("fr-FR") + " ?" }),
+        h("span", { class: "hint", text: "Les éléments de la sauvegarde remplacent ceux qui portent le même identifiant. Les éléments créés depuis sont conservés." }),
+        h("div", { class: "mini-row" },
+          h("button", { class: "btn primary", onclick: function () { doRestore(restoreDump); restoreDump = null; } }, "Restaurer"),
+          h("button", { class: "btn", onclick: function () { restoreDump = null; render(); } }, "Annuler"))));
+    }
+    bk.appendChild(bb);
+    wrap.appendChild(bk);
+    return wrap;
+  }
+  var restoreDump = null;
+
+  /* =====================================================================
+     Publier le jeu : un fichier HTML autonome
+     ===================================================================== */
+  function publishBox(r, touch, rerender) {
+    r.actesNoms = r.actesNoms || {};
+    r.crimes = r.crimes || {};
+    if (!r.exportActes) r.exportActes = { "1": true, "2": true, "3": true, "0": false };
+    var box = h("section", { class: "box", id: "publier" }, h("div", { class: "box-h" }, h("h2", { text: "Publier le jeu" }),
+      h("span", { class: "hint", text: "Ce qui ne sert qu'au jeu publié, puis le bouton pour le produire" })));
+    var b = h("div", { class: "box-b" });
+    b.appendChild(h("div", { class: "grid2" },
+      h("label", { class: "f" }, "Accroche (sous le titre)", h("input", { type: "text", value: r.accroche || "", placeholder: "ex. : Sous les ruines de l'abbaye d'Ivoire dort une cité que les vivants ont oubliée.", oninput: function (e) { r.accroche = e.target.value; touch(); } })),
+      h("label", { class: "f" }, "Auteur", h("input", { type: "text", value: r.auteur || "", oninput: function (e) { r.auteur = e.target.value; touch(); } })),
+      h("label", { class: "f" }, "Bouton qui lance l'aventure", h("input", { type: "text", value: r.boutonDepart || "", placeholder: "Commencer l'aventure", oninput: function (e) { r.boutonDepart = e.target.value; touch(); } }))));
+    b.appendChild(h("label", { class: "f" }, "Prologue (facultatif, affiché avant la création du personnage)", h("textarea", { class: "story", style: "min-height:110px", value: r.prologue || "", oninput: function (e) { r.prologue = e.target.value; touch(); } })));
+    b.appendChild(h("div", { class: "grid2" }, ["1", "2", "3"].map(function (a) {
+      return h("label", { class: "f" }, "Nom de l'acte " + ["", "I", "II", "III"][+a], h("input", { type: "text", value: r.actesNoms[a] || "", placeholder: ["", "ex. : L'abbaye d'Ivoire", "ex. : La cité enfouie", "ex. : Le palais d'Ivoire"][+a], oninput: function (e) { r.actesNoms[a] = e.target.value; touch(); } }));
+    })));
+
+    b.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Occupations et crimes, vus par le lecteur" }), h("span", { class: "hint", text: "Genre et {nom} fonctionnent ici aussi" })));
+    var t = h("table", { class: "mini" }, h("thead", null, h("tr", null, ["Occupation", "Description pour le lecteur", "Crime (titre)", "Récit du crime", "Peine"].map(function (x) { return h("th", { text: x }); }))));
+    var tb = h("tbody");
+    (r.occupations || []).forEach(function (o) {
+      var c = r.crimes[o.nom] = r.crimes[o.nom] || {};
+      tb.appendChild(h("tr", null,
+        h("td", { text: o.nom || "(sans nom)" }),
+        h("td", null, h("textarea", { value: o.desc || "", oninput: function (e) { o.desc = e.target.value; touch(); } })),
+        h("td", null, h("textarea", { value: c.titre || "", placeholder: "ex. : Rixe meurtrière dans une taverne", oninput: function (e) { c.titre = e.target.value; touch(); } })),
+        h("td", null, h("textarea", { value: c.texte || "", placeholder: "Ce qui s'est passé, en deux ou trois phrases", oninput: function (e) { c.texte = e.target.value; touch(); } })),
+        h("td", null, h("input", { type: "text", value: c.peine || "", placeholder: "ex. : Pendaison", oninput: function (e) { c.peine = e.target.value; touch(); } }))));
+    });
+    t.appendChild(tb);
+    b.appendChild(h("div", { class: "tbl-wrap" }, t));
+    var t2 = h("table", { class: "mini" }, h("thead", null, h("tr", null, h("th", { text: "Origine" }), h("th", { text: "Ce que l'origine ajoute au crime (une phrase, facultatif)" }))));
+    var tb2 = h("tbody");
+    (r.origines || []).forEach(function (o) {
+      tb2.appendChild(h("tr", null, h("td", { text: o.nom || "(sans nom)" }),
+        h("td", null, h("textarea", { value: o.aggravation || "", placeholder: "ex. : Et tu viens de Lorme : on te soupçonne en plus d'espionner pour la Nécrocratie.", oninput: function (e) { o.aggravation = e.target.value; touch(); } }))));
+    });
+    t2.appendChild(tb2);
+    b.appendChild(h("div", { class: "tbl-wrap" }, t2));
+    b.appendChild(h("label", { class: "f" }, "Message de fin de démo (quand le joueur atteint un passage non inclus)", h("textarea", { value: r.finDemo || "", placeholder: "Merci d'avoir joué ! Ton avis compte : dis à l'auteur ce qui t'a plu, ce qui t'a perdu, et ce que tu aurais voulu faire.", oninput: function (e) { r.finDemo = e.target.value; touch(); } })));
+
+    b.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Produire le fichier du jeu" })));
+    b.appendChild(h("div", { class: "mini-row" }, h("span", { class: "hint", text: "Actes inclus :" }),
+      [["1", "Acte I"], ["2", "Acte II"], ["3", "Acte III"], ["0", "Sans acte"]].map(function (a) {
+        return h("label", { class: "f inline" }, h("input", { type: "checkbox", checked: !!r.exportActes[a[0]], onchange: function (e) { r.exportActes[a[0]] = e.target.checked; touch(); } }), a[1]);
+      })));
+    var msg = h("p", { class: "hint", "aria-live": "polite" });
+    b.appendChild(h("div", { class: "mini-row" },
+      h("button", { class: "btn primary", onclick: function () { publishGame(msg); } }, "Publier le jeu"),
+      h("span", { class: "hint", text: "Un fichier .html qui contient tout : le jeu, ton texte, tes illustrations. Il s'ouvre dans n'importe quel navigateur, s'envoie par mail ou s'héberge où tu veux." })));
+    b.appendChild(msg);
+    box.appendChild(b);
+    return box;
+  }
+  function blobToDataURL(blob) {
+    return new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(blob); });
+  }
+  function slug(s) { return String(s || "livre").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "livre"; }
+  function publishGame(msg) {
+    var r = clone(R()), inc = r.exportActes || { "1": true, "2": true, "3": true, "0": true };
+    function say(t, bad) { msg.textContent = t; msg.style.color = bad ? "var(--bad)" : ""; }
+    if (!downloads) { say("Le téléchargement n'est disponible que dans claude.ai.", true); return; }
+    if (!r.depart || !D.passages[r.depart]) { say("Choisis d'abord un passage de départ, plus haut dans les Réglages.", true); return; }
+    var ps = {};
+    Object.keys(D.passages).forEach(function (id) { var p = D.passages[id]; if (inc[String(p.acte || "0")]) { var c = clone(p); delete c.notes; delete c.statut; delete c.titre; delete c.maj; ps[id] = c; } });
+    if (!ps[r.depart]) { say("Le passage de départ appartient à un acte que tu n'as pas coché.", true); return; }
+    var errs = checks().filter(function (i) { return i.lvl === "erreur" && (!i.pid || ps[i.pid]); }).length;
+    say("Préparation du jeu…");
+    var withImg = Object.keys(ps).filter(function (id) { return ps[id].image; }), lost = 0;
+    var chain = Promise.resolve();
+    withImg.forEach(function (id, i) {
+      chain = chain.then(function () {
+        say("Intégration des illustrations… " + (i + 1) + " / " + withImg.length);
+        return imgBlob(ps[id].image).then(blobToDataURL)
+          .then(function (d) { ps[id].imageData = d; }, function () { lost++; });
+      }).then(function () { delete ps[id].image; });
+    });
+    var d = new Date(), stamp = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    chain.then(function () { return fetch("lecteur-modele.html"); }).then(function (res) { if (!res.ok) throw new Error("modele"); return res.text(); }).then(function (tpl) {
+      delete r.exportActes;
+      var livre = { id: slug(r.titre), demo: d.toLocaleDateString("fr-FR"), reglages: r, passages: ps };
+      ["objets", "mots", "infos", "ennemis"].forEach(function (c) { livre[c] = {}; Object.keys(D[c]).forEach(function (id) { var o = clone(D[c][id]); delete o.notes; delete o.maj; livre[c][id] = o; }); });
+      var json = JSON.stringify(livre).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+      var html = tpl.split("__LIVRE_JSON__").join(json).split("{{TITRE}}").join(esc(r.titre || "Livre"));
+      return downloads.save({ filename: slug(r.titre) + "-demo-" + stamp + ".html", data: html }).then(function () {
+        say("Jeu publié : " + Object.keys(ps).length + " passages" + (withImg.length ? ", " + (withImg.length - lost) + " illustration(s)" : "") + "." + (lost ? " " + lost + " illustration(s) n'ont pas pu être intégrées." : "") + (errs ? " Attention : " + errs + " erreur(s) restent dans les Vérifications." : ""), !!lost);
+      }, function (e) { say(e && e.code === "declined" ? "Téléchargement annulé." : "Le téléchargement a échoué.", true); });
+    }).catch(function () { say("Impossible de préparer le jeu. Recharge l'atelier et réessaie.", true); });
+  }
+  function condTxt(list) {
+    return (list || []).map(function (c) {
+      var lbl = (COND_TYPES.filter(function (t) { return t[0] === c.type; })[0] || [0, c.type])[1];
+      var v = c.type === "objet" || c.type === "sansobjet" ? (D.objets[c.val] || {}).nom : c.type === "mot" ? (D.mots[c.val] || {}).nom : c.type === "info" || c.type === "sansinfo" ? (D.infos[c.val] || {}).nom : c.type === "visite" ? (D.passages[c.val] || {}).num : c.type === "stat" ? STATS[c.stat || "for"] + " " + (c.op || ">=") + " " + c.n : c.type === "usure" || c.type === "compteur" ? (c.op || ">=") + " " + c.n : c.type === "genre" ? (c.val === "f" ? "féminin" : c.val === "n" ? "neutre" : "masculin") : c.val;
+      return lbl + " " + (v == null ? "?" : v);
+    }).join(" et ");
+  }
+  function exportBook(g, msg) {
+    var out = ["# " + (R().titre || "Livre"), "", "Version " + (g === "f" ? "féminine" : g === "n" ? "neutre" : "masculine") + ", exportée le " + new Date().toLocaleDateString("fr-FR") + ".", ""];
+    sortedPassages().forEach(function (p) {
+      out.push("## " + (p.num || "?") + (p.titre ? " · " + p.titre : ""), "");
+      (p.segments || []).forEach(function (sg, i) {
+        if (i > 0) out.push("> **[Si " + condTxt(sg.cond) + "]**", ">", "> " + genre(sg.texte, g, "[Nom]").replace(/\n/g, "\n> "), "");
+        else out.push(genre(sg.texte, g, "[Nom]"), "");
+      });
+      var is = p.issue || {};
+      if (is.type === "choix") (is.choix || []).forEach(function (c) { out.push("- " + genre(c.texte || "(sans texte)", g, "[Nom]") + " → " + (D.passages[c.cible] ? D.passages[c.cible].num : "?") + ((c.cond || []).length ? " *(si " + condTxt(c.cond) + ")*" : "")); });
+      if (is.type === "test") out.push("- Test de " + STATS[is.stat || "hab"] + (is.modif ? " (" + is.modif + ")" : "") + " : réussite → " + ((D.passages[is.succes] || {}).num || "?") + ", échec → " + ((D.passages[is.echec] || {}).num || "?"));
+      if (is.type === "combat") out.push("- Combat : " + ((D.ennemis[is.ennemi] || {}).nom || "?") + " ; victoire → " + ((D.passages[is.victoire] || {}).num || "?"));
+      if (is.type === "fin") out.push("- **" + (is.fin || "Fin") + "** : " + (is.titreFin || ""));
+      out.push("");
+    });
+    var d = new Date(), name = "kepultum-livre-" + (g === "f" ? "feminin" : g === "n" ? "neutre" : "masculin") + "-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".md";
+    downloads.save({ filename: name, data: out.join("\n") }).then(function () { msg.textContent = "Livre téléchargé."; }, function (e) { msg.textContent = e && e.code === "declined" ? "Téléchargement annulé." : "Le téléchargement n'est pas disponible ici."; });
+  }
+
+  /* =====================================================================
+     Onglet Jouer : partie complète, comme un lecteur
+     ===================================================================== */
+  function viewPlay() {
+    var R_ = R(), wrap = h("div", { class: "play-wrap" });
+    var dep = R_.depart && D.passages[R_.depart];
+    if (UI.playNew || !P || !P.cur || P.mode !== "jouer") {
+      var st = UI.playSetup = UI.playSetup || { genre: "m", origine: R_.origines[0] ? R_.origines[0].nom : "", occupation: R_.occupations[0] ? R_.occupations[0].nom : "", rolled: null };
+      var box = h("section", { class: "box reader" }, h("div", { class: "box-h" }, h("h3", { text: "Nouvelle partie" })));
+      var b = h("div", { class: "box-b" });
+      if (!dep) b.appendChild(h("p", { class: "ko", text: "Choisis d'abord un passage de départ dans les Réglages." }));
+      function choiceList(title, items, key, describe) {
+        var sec = h("div", { class: "sec" }, h("div", { class: "sec-h" }, h("h3", { text: title })));
+        var g = h("div", { class: "pick-grid" });
+        items.forEach(function (it) {
+          g.appendChild(h("button", { class: "pick", "aria-pressed": st[key] === it.nom ? "true" : "false", onclick: function () { st[key] = it.nom; render(); } },
+            h("strong", { text: it.nom }), describe(it) ? h("span", { text: describe(it) }) : null));
+        });
+        sec.appendChild(g);
+        return sec;
+      }
+      b.appendChild(h("label", { class: "f", style: "max-width:320px" }, "Ton nom", h("input", { type: "text", id: "play-nom", value: st.nom || "", placeholder: R_.nomDefaut || "Voyageur", oninput: function (e) { st.nom = e.target.value; } })));
+      b.appendChild(h("div", { class: "sec" }, h("div", { class: "sec-h" }, h("h3", { text: "Genre" })),
+        h("div", { class: "seg" }, [["m", "Un aventurier"], ["f", "Une aventurière"]].concat(neutreOn() ? [["n", "Un·e aventurier·e (iel)"]] : []).map(function (o) { return h("button", { "aria-pressed": st.genre === o[0] ? "true" : "false", onclick: function () { st.genre = o[0]; render(); } }, o[1]); }))));
+      b.appendChild(choiceList("Origine", R_.origines, "origine", function (o) { return o.desc; }));
+      b.appendChild(choiceList("Occupation", R_.occupations, "occupation", function (o) { return (o.fav || []).map(function (k) { return k === "cp" ? "Port" : STATS[k]; }).join(", ") + " · " + (o.arme || "") + " " + (o.degats || ""); }));
+      var rolledTxt = st.rolled ? "Force " + st.rolled.for + " · Habileté " + st.rolled.hab + " · Sagesse " + st.rolled.sag : "Valeurs fixes des Réglages : Force " + R_.base.for + " · Habileté " + R_.base.hab + " · Sagesse " + R_.base.sag;
+      b.appendChild(h("div", { class: "sec" }, h("div", { class: "sec-h" }, h("h3", { text: "Caractéristiques (avant le bonus d'occupation)" })),
+        h("div", { class: "mini-row" }, h("span", { text: rolledTxt }),
+          h("button", { class: "btn small", onclick: function () { st.rolled = { for: roll([3, 6, 1]), hab: roll([3, 6, 1]), sag: roll([3, 6, 1]) }; render(); } }, "🎲 Lancer 3d6+1"),
+          st.rolled ? h("button", { class: "btn small", onclick: function () { st.rolled = null; render(); } }, "Valeurs fixes") : null)));
+      b.appendChild(h("div", null, h("button", { class: "btn primary", disabled: dep ? null : "disabled", onclick: function () {
+        P = newPlayer(clone(st)); P.mode = "jouer"; P.start = R_.depart; enter(R_.depart); UI.playNew = false; render();
+      } }, "Commencer l'aventure")));
+      box.appendChild(b);
+      wrap.appendChild(box);
+      return wrap;
+    }
+    wrap.appendChild(previewPanel());
+    return wrap;
+  }
+  function doRestore(dump) {
+    var chain = Promise.resolve();
+    COLS.forEach(function (c) {
+      Object.keys(dump[c] || {}).forEach(function (id) {
+        var o = dump[c][id]; o.id = id; D[c][id] = o;
+        chain = chain.then(function () { return writeDoc(c + "/" + id, o); });
+      });
+    });
+    if (dump.reglages) { D.reglages = dump.reglages; chain = chain.then(function () { return writeDoc("reglages/livre", dump.reglages); }); }
+    chain.then(function () { renderTabs(); render(); });
+  }
+
+  /* =====================================================================
+     Aide
+     ===================================================================== */
+  function viewHelp() {
+    var s = h("section", { class: "box" }, h("div", { class: "box-h" }, h("h2", { text: "Comment écrire avec l'atelier" })));
+    s.appendChild(h("div", { class: "box-b", html: [
+      "<p><b>Un passage</b> = un numéro, un texte, éventuellement une image, des effets à l'entrée, et une issue : des choix, un test, un combat ou une fin. Tout s'enregistre tout seul, sur tous tes ordinateurs.</p>",
+      "<p><b>Le genre du héros</b> : masculin, féminin ou neutre (iel). Écris au masculin et marque ce qui change :</p><ul>",
+      "<li><code>accusé·e</code> devient « accusé », « accusée », et reste « accusé·e » au neutre. Avec un pluriel : <code>prêt·e·s</code>.</li>",
+      "<li><code>{il|elle|iel}</code>, <code>{heureux|heureuse|heureux·se}</code>, <code>{un aventurier|une aventurière|un·e aventurier·e}</code> : masculin, féminin, neutre, séparés par des barres. Si tu n'écris que deux formes, le neutre reprend la forme masculine, et les Vérifications te le signalent.</li>",
+      "<li>Les boutons au-dessus du texte insèrent ces marques pour toi. L'aperçu te permet de basculer d'un genre à l'autre.</li></ul>",
+      "<p><b>Publier le jeu :</b> dans les Réglages, la section « Publier le jeu » réunit ce qui ne sert qu'au lecteur (accroche, prologue, noms des actes, descriptions des occupations, crimes) et produit un fichier .html autonome. Envoie-le à tes testeurs : il s'ouvre dans n'importe quel navigateur, et leur progression s'enregistre dans leur navigateur. Un passage d'un acte non inclus devient la « fin de la démo ».</p>",
+      "<p><b>Le nom du héros :</b> écris <code>{nom}</code> là où le nom choisi par le joueur doit apparaître, par exemple « C'est {elle|lui|iel}, {nom} ! ». S'il n'en donne pas, le nom par défaut des Réglages s'affiche.</p>",
+      "<p><b>Formes neutres usuelles</b> (il n'existe pas de norme unique ; choisis-en une et garde-la dans tout le livre) : il/elle → <i>iel</i> ; ils/elles → <i>iels</i> ; le/la → <i>lae</i> ; celui/celle → <i>cellui</i> ; ceux/celles → <i>celleux</i> ; lui/elle (après une préposition) → <i>ellui</i> ; un/une → <i>un·e</i> ; mon/ma → <i>mon</i> devant voyelle, sinon <i>man</i> ou <i>mon·a</i>. Le genre neutre peut se désactiver dans les Réglages.</p>",
+      "<p><b>Les variations selon le personnage</b>, de deux façons, à combiner librement :</p><ul>",
+      "<li><b>Un bloc conditionnel</b> dans le texte : un paragraphe qui ne s'affiche que si le personnage est, par exemple, Réfugié de Lorme, ou connaît une information.</li>",
+      "<li><b>Un choix conditionnel</b> : un choix réservé à certains personnages, caché ou grisé avec une raison pour les autres.</li></ul>",
+      "<p><b>Les objets, Mots, informations et ennemis</b> se créent dans leurs onglets, puis se choisissent dans des listes. Une « information », c'est ce que le joueur a découvert : un indice, un nom, un secret (l'équivalent des mots-codes).</p>",
+      "<p><b>L'aperçu</b> joue ton livre avec le vrai moteur. Change de genre, d'origine ou d'occupation pour vérifier tes variations.</p>",
+      "<p><b>Les vérifications</b> listent les impasses, les liens cassés, les passages inaccessibles et les objets, Mots ou informations demandés mais jamais donnés. Définis ton passage de départ dans les Réglages pour qu'elles soient complètes.</p>",
+      "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",
+      "<p><b>La sauvegarde par acte :</b> coche « Début d'acte » sur le premier passage de chaque acte. Quand le joueur meurt, il y revient avec l'état qu'il avait en arrivant.</p>",
+      "<p><b>L'onglet Jouer</b> lance une vraie partie depuis le passage de départ, avec création du personnage, comme le vivra ton lecteur.</p>",
+      "<p><b>Relire ton livre :</b> dans les Réglages, « Livre en texte » télécharge tout ton livre dans un fichier lisible, en version masculine ou féminine.</p>",
+      "<p><b>Mise en forme :</b> <code>*italique*</code>. Laisse une ligne vide entre deux paragraphes.</p>"
+    ].join("") }));
+    return s;
+  }
+
+  /* =====================================================================
+     Stockage GitHub (hors de claude.ai)
+     Le livre vit dans un dépôt privé : livre.json + images/.
+     ===================================================================== */
+  var GH_KEY = "atelier-kepultum:github";
+  function b64FromBytes(bytes) { var s = "", CH = 0x8000; for (var i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH)); return btoa(s); }
+  function b64FromText(t) { return b64FromBytes(new TextEncoder().encode(t)); }
+  function textFromB64(b) { var bin = atob(String(b).replace(/\s/g, "")), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new TextDecoder().decode(u); }
+  function ghConfig() { try { return JSON.parse(localStorage.getItem(GH_KEY) || "null"); } catch (e) { return null; } }
+  function makeGH(cfg) {
+    var G = { cfg: cfg, sha: null, ready: false, saving: false, pending: false, deleted: {}, timer: null, imgCache: {}, imgLoading: {} };
+    function url(path) { return "https://api.github.com/repos/" + encodeURIComponent(cfg.owner) + "/" + encodeURIComponent(cfg.repo) + path; }
+    G.api = function (path, opts) {
+      opts = opts || {};
+      var headers = { "Authorization": "Bearer " + cfg.token, "Accept": opts.raw ? "application/vnd.github.raw" : "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+      if (opts.body) headers["Content-Type"] = "application/json";
+      return fetch(url(path), { method: opts.method || "GET", headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined, cache: "no-store" });
+    };
+    G.explain = function (status) {
+      if (status === 401) return "Jeton GitHub refusé : il est peut-être expiré. Reconnecte-toi dans les Réglages.";
+      if (status === 403) return "Ce jeton n'a pas le droit d'écrire dans le dépôt (permission Contents : Read and write).";
+      if (status === 404) return "Dépôt introuvable, ou jeton sans accès à ce dépôt.";
+      return "GitHub a répondu une erreur (" + status + ").";
+    };
+    G.fetchBook = function () {
+      return G.api("/contents/livre.json?ref=" + encodeURIComponent(cfg.branch)).then(function (res) {
+        if (res.status === 404) return { sha: null, book: null };
+        if (!res.ok) throw { status: res.status };
+        return res.json().then(function (meta) {
+          if (meta.content && meta.encoding === "base64") return { sha: meta.sha, book: JSON.parse(textFromB64(meta.content)) };
+          return G.api("/contents/livre.json?ref=" + encodeURIComponent(cfg.branch), { raw: true }).then(function (r2) { return r2.text(); }).then(function (t) { return { sha: meta.sha, book: JSON.parse(t) }; });
+        });
+      });
+    };
+    G.apply = function (book) {
+      COLS.forEach(function (c) { var src = (book && book[c]) || {}, next = {}; Object.keys(src).forEach(function (id) { var o = src[id]; o.id = id; next[id] = o; }); D[c] = next; });
+      D.reglages = book && book.reglages ? Object.assign(clone(DEFAULT_REGLAGES), book.reglages) : null;
+    };
+    G.serialize = function () {
+      var book = { version: 1, maj: new Date().toISOString(), reglages: D.reglages || null };
+      COLS.forEach(function (c) { book[c] = {}; Object.keys(D[c]).forEach(function (id) { var o = clone(D[c][id]); delete o.id; book[c][id] = o; }); });
+      return JSON.stringify(book, null, 1);
+    };
+    G.merge = function (remote) {
+      COLS.forEach(function (c) {
+        var src = (remote && remote[c]) || {};
+        Object.keys(src).forEach(function (id) {
+          var mine = D[c][id], theirs = src[id];
+          if (G.deleted[c + "/" + id]) return;
+          if (!mine || String(theirs.maj || "") > String(mine.maj || "")) { theirs.id = id; D[c][id] = theirs; }
+        });
+      });
+      if (remote && remote.reglages && (!D.reglages || String(remote.reglages.maj || "") > String(D.reglages.maj || ""))) D.reglages = Object.assign(clone(DEFAULT_REGLAGES), remote.reglages);
+    };
+    G.load = function () {
+      return G.fetchBook().then(function (r) {
+        G.sha = r.sha; G.apply(r.book); G.ready = true; lastErr = null;
+        COLS.forEach(function (c) { loaded[c] = true; }); loaded.reglages = true;
+        setStatus(); renderTabs(); render();
+      });
+    };
+    G.touch = function (path, isDelete) {
+      if (isDelete) G.deleted[path] = true; else delete G.deleted[path];
+      G.pending = true; setStatus();
+      clearTimeout(G.timer);
+      G.timer = setTimeout(G.commit, 2500);
+    };
+    G.commit = function (retry) {
+      clearTimeout(G.timer);
+      if (G.saving) { G.timer = setTimeout(G.commit, 1500); return; }
+      if (!G.pending) return;
+      G.saving = true; G.pending = false; setStatus();
+      var body = { message: "Atelier : modifications du " + new Date().toLocaleString("fr-FR"), content: b64FromText(G.serialize()), branch: cfg.branch };
+      if (G.sha) body.sha = G.sha;
+      G.api("/contents/livre.json", { method: "PUT", body: body }).then(function (res) {
+        if (res.ok) return res.json().then(function (j) { G.sha = j.content.sha; G.deleted = {}; lastErr = null; });
+        if ((res.status === 409 || res.status === 422) && !retry) {
+          return G.fetchBook().then(function (r) { G.merge(r.book); G.sha = r.sha; G.pending = true; G.saving = false; G.commit(true); onRemote("passages"); throw "retried"; });
+        }
+        throw { status: res.status };
+      }).then(function () {
+        G.saving = false; setStatus();
+        if (G.pending) G.timer = setTimeout(G.commit, 1500);
+      }, function (e) {
+        if (e === "retried") return;
+        G.saving = false; G.pending = true;
+        lastErr = e && e.status ? G.explain(e.status) : "Hors connexion : nouvel essai dans 30 secondes";
+        setStatus();
+        G.timer = setTimeout(G.commit, 30000);
+      });
+    };
+    G.refresh = function () {
+      if (!G.ready || G.pending || G.saving) return;
+      G.fetchBook().then(function (r) {
+        if (r.sha && r.sha !== G.sha && !G.pending && !G.saving) { G.sha = r.sha; G.apply(r.book); onRemote("passages"); }
+      }, function () {});
+    };
+    /* Illustrations : images/<id>.<ext> dans le dépôt */
+    G.upload = function (file) {
+      var ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+      var path = "images/" + uid("img") + "." + ext;
+      return file.arrayBuffer().then(function (buf) {
+        return G.api("/contents/" + path, { method: "PUT", body: { message: "Atelier : ajout d'une illustration", content: b64FromBytes(new Uint8Array(buf)), branch: cfg.branch } });
+      }).then(function (res) { if (!res.ok) throw { code: res.status === 422 ? "too_large" : "failed" }; G.imgCache[path] = URL.createObjectURL(file); return { id: path }; });
+    };
+    G.remove = function (path) {
+      return G.api("/contents/" + path + "?ref=" + encodeURIComponent(cfg.branch)).then(function (r) { return r.ok ? r.json() : null; }).then(function (meta) {
+        if (!meta) return;
+        return G.api("/contents/" + path, { method: "DELETE", body: { message: "Atelier : suppression d'une illustration", sha: meta.sha, branch: cfg.branch } });
+      });
+    };
+    G.blob = function (path) {
+      var ext = String(path.split(".").pop()).toLowerCase(), type = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" }[ext] || "application/octet-stream";
+      return G.api("/contents/" + path + "?ref=" + encodeURIComponent(cfg.branch), { raw: true }).then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (buf) { return new Blob([buf], { type: type }); });
+    };
+    G.imgSrc = function (path) {
+      if (G.imgCache[path]) return G.imgCache[path];
+      if (!G.imgLoading[path]) {
+        G.imgLoading[path] = true;
+        G.blob(path).then(function (b) {
+          G.imgCache[path] = URL.createObjectURL(b);
+          document.querySelectorAll("img[data-img]").forEach(function (im) { if (im.getAttribute("data-img") === path) im.src = G.imgCache[path]; });
+        }, function () { G.imgLoading[path] = false; });
+      }
+      return "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+    };
+    return G;
+  }
+  function imgSrc(id) { return GH ? GH.imgSrc(id) : "/_blob/" + id; }
+  function imgBlob(id) { return GH ? GH.blob(id) : fetch("/_blob/" + id).then(function (res) { if (!res.ok) throw new Error(); return res.blob(); }); }
+  var plainDownloads = {
+    save: function (o) {
+      var blob = new Blob([o.data], { type: /\.html$/.test(o.filename) ? "text/html" : /\.json$/.test(o.filename) ? "application/json" : "text/markdown" });
+      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = o.filename;
+      document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      return Promise.resolve({ status: "saved" });
+    }
+  };
+  function startGithub() {
+    offline = false; db = null;
+    downloads = plainDownloads;
+    var cfg = ghConfig();
+    if (!cfg || !cfg.token) { GH = makeGH({ owner: "", repo: "", branch: "main", token: "" }); renderTabs(); render(); setStatus(); return; }
+    GH = makeGH(cfg);
+    assets = { upload: GH.upload, delete: GH.remove };
+    setStatus();
+    GH.load().catch(function (e) { lastErr = e && e.status ? GH.explain(e.status) : "Impossible de joindre GitHub : vérifie ta connexion."; setStatus(); render(); });
+  }
+  function viewConnexion() {
+    var cfg = ghConfig() || { owner: "MuirennSblFn", repo: "kepultum-livre", branch: "main", token: "" };
+    var box = h("section", { class: "box", style: "max-width:640px;margin:0 auto" }, h("div", { class: "box-h" }, h("h2", { text: "Connexion au dépôt du livre" })));
+    var b = h("div", { class: "box-b" });
+    b.appendChild(h("p", { class: "hint", text: "Ton livre est enregistré dans un dépôt GitHub privé. Indique-le ici, avec ton jeton d'accès : c'est à faire une seule fois par ordinateur. Le jeton reste dans ce navigateur." }));
+    var owner = h("input", { type: "text", id: "gh-owner", value: cfg.owner || "" }), repo = h("input", { type: "text", id: "gh-repo", value: cfg.repo || "" }),
+      branch = h("input", { type: "text", id: "gh-branch", value: cfg.branch || "main" }), token = h("input", { type: "password", id: "gh-token", value: "", placeholder: "github_pat_…", autocomplete: "off" });
+    b.appendChild(h("div", { class: "grid2" }, h("label", { class: "f" }, "Compte GitHub", owner), h("label", { class: "f" }, "Dépôt du livre", repo)));
+    b.appendChild(h("div", { class: "grid2" }, h("label", { class: "f" }, "Branche", branch), h("label", { class: "f" }, "Jeton d'accès (fine-grained, Contents : Read and write)", token)));
+    var msg = h("p", { class: "hint", "aria-live": "polite" });
+    b.appendChild(h("div", { class: "mini-row" }, h("button", { class: "btn primary", onclick: function () {
+      var c = { owner: owner.value.trim(), repo: repo.value.trim(), branch: branch.value.trim() || "main", token: token.value.trim() || cfg.token || "" };
+      if (!c.owner || !c.repo || !c.token) { msg.textContent = "Remplis les quatre champs."; msg.style.color = "var(--bad)"; return; }
+      msg.textContent = "Connexion…"; msg.style.color = "";
+      makeGH(c).api("").then(function (res) {
+        if (!res.ok) { msg.textContent = makeGH(c).explain(res.status); msg.style.color = "var(--bad)"; return; }
+        try { localStorage.setItem(GH_KEY, JSON.stringify(c)); } catch (e) { msg.textContent = "Ce navigateur refuse d'enregistrer la connexion (navigation privée ?)."; msg.style.color = "var(--bad)"; return; }
+        lastErr = null; startGithub();
+      }, function () { msg.textContent = "Impossible de joindre GitHub : vérifie ta connexion."; msg.style.color = "var(--bad)"; });
+    } }, "Se connecter"), msg));
+    box.appendChild(b);
+    return box;
+  }
+  function githubSettingsBox() {
+    var c = GH.cfg;
+    return h("section", { class: "box" }, h("div", { class: "box-h" }, h("h2", { text: "Dépôt GitHub" })),
+      h("div", { class: "box-b" },
+        h("p", { class: "hint", html: "Ton livre est enregistré dans <b>" + esc(c.owner + "/" + c.repo) + "</b> (branche " + esc(c.branch) + "). Chaque enregistrement y crée une version : tu peux revenir à n'importe quel état passé depuis GitHub." }),
+        h("div", { class: "mini-row" },
+          h("a", { class: "btn", href: "https://github.com/" + encodeURIComponent(c.owner) + "/" + encodeURIComponent(c.repo) + "/commits/" + encodeURIComponent(c.branch) + "/livre.json", target: "_blank", rel: "noopener" }, "Historique des versions sur GitHub"),
+          h("button", { class: "btn danger", onclick: function () { try { localStorage.removeItem(GH_KEY); } catch (e) {} location.reload(); } }, "Déconnecter cet ordinateur"))));
+  }
+  window.addEventListener("focus", function () { if (GH) GH.refresh(); });
+  document.addEventListener("visibilitychange", function () { if (GH && document.visibilityState === "hidden" && GH.pending) GH.commit(); });
+
+  /* =====================================================================
+     Démarrage
+     ===================================================================== */
+  function boot(tries) {
+    tries = tries || 0;
+    var outside = /github\.io$/.test(location.hostname) || location.protocol === "file:" || /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && !window.claude;
+    if (outside) { startGithub(); return; }
+    if (!tries) { renderTabs(); render(); setStatus(); }
+    var c = window.claude;
+    if (!c || typeof c.use !== "function") { if (tries < 30) { setTimeout(function () { boot(tries + 1); }, 100); return; } startGithub(); return; }
+    Promise.all([c.use("db"), c.use("assets").catch(function () { return null; }), c.use("downloads").catch(function () { return null; })]).then(function (r) {
+      assets = r[1]; downloads = r[2]; start(r[0]);
+    }, function () { start(null); });
+  }
+  function start(d) {
+    db = d;
+    if (!db) {
+      loadOffline();
+      document.getElementById("banner").appendChild(h("div", { class: "banner", text: "Ouvre l'atelier dans claude.ai, connecté à ton compte, pour que ton travail soit enregistré en ligne. Ici, il ne reste que dans ce navigateur." }));
+      setStatus(); renderTabs(); render();
+      return;
+    }
+    subscribe();
+  }
+  window.addEventListener("beforeunload", function (e) { if (Object.keys(dirty).length || (GH && (GH.pending || GH.saving))) { e.preventDefault(); e.returnValue = ""; } });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { boot(0); }); else boot(0);
+})();
+</script>
+
+</body>
+</html>
