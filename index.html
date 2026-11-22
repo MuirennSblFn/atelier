@@ -739,7 +739,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   var FX_TYPES = [
     ["donner", "Donner l'objet"], ["retirer", "Retirer l'objet"], ["mot", "Apprendre le Mot"],
     ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["stat", "Modifier une caractéristique"],
-    ["usure", "Ajouter de l'Usure"], ["compteur", "Avancer le compteur de l'Ordre"]
+    ["lancer", "Prononcer le Mot (coûte son Mana)"], ["usure", "Ajouter de l'Usure"], ["compteur", "Avancer le compteur de l'Ordre"]
   ];
   function fxEditor(list, touch, rerender) {
     var box = h("div", { class: "sec" });
@@ -751,7 +751,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       if (f.type === "donner" || f.type === "retirer") {
         row.appendChild(selectEl(catOpts("objets", "— objet —"), f.val || "", set("val")));
         row.appendChild(h("label", { class: "f inline" }, "×", h("input", { type: "number", min: 1, value: f.n || 1, oninput: function (e) { f.n = +e.target.value || 1; touch(); } })));
-      } else if (f.type === "mot") row.appendChild(selectEl(catOpts("mots", "— Mot —"), f.val || "", set("val")));
+      } else if (f.type === "mot" || f.type === "lancer") row.appendChild(selectEl(catOpts("mots", "— Mot —"), f.val || "", set("val")));
       else if (f.type === "info" || f.type === "oubli") row.appendChild(selectEl(catOpts("infos", "— information —"), f.val || "", set("val")));
       else {
         if (f.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), f.stat || "vig", set("stat")));
@@ -965,6 +965,12 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
       }
       else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure"); }
+      else if (f.type === "lancer" && f.val) {
+        var lm = D.mots[f.val] || {}, cout = +lm.cout || 0, paye = Math.min(cout, P.s.man), reste = cout - paye;
+        P.s.man -= paye; P.usure += reste;
+        out.push((lm.nom || "Mot") + " prononcé : " + [paye ? "−" + paye + " Mana" : "", reste ? "+" + reste + " Usure" : ""].filter(Boolean).join(", ") + (cout ? "" : "aucun coût"));
+      }
+
       else if (f.type === "compteur") { P.compteur += n; out.push("Compteur de l'Ordre : " + P.compteur); }
     });
     return out;

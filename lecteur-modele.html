@@ -419,7 +419,12 @@ button { cursor: pointer; }
         else if (k === "man") P.s.man = Math.max(0, Math.min(eff("manMax"), P.s.man + n));
         else P.s[k] = Math.max(0, P.s[k] + n);
         out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
-      } else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure"); }
+      } else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure");
+      } else if (f.type === "lancer" && f.val) {
+        var lm = L.mots[f.val] || {}, cout = +lm.cout || 0, paye = Math.min(cout, P.s.man), reste = cout - paye;
+        P.s.man -= paye; P.usure += reste;
+        out.push((lm.nom || "Mot") + " prononcé : " + [paye ? "−" + paye + " Mana" : "", reste ? "+" + reste + " Usure" : ""].filter(Boolean).join(", ") + (cout ? "" : "aucun coût"));
+      }
       else if (f.type === "compteur") { P.compteur += n; }
     });
     return out;
