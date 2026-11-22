@@ -698,7 +698,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ["origine", "Origine est"], ["occupation", "Occupation est"], ["genre", "Genre est"],
     ["objet", "Possède l'objet"], ["sansobjet", "Ne possède pas l'objet"], ["mot", "Connaît le Mot"],
     ["info", "Connaît l'information"], ["sansinfo", "Ne connaît pas l'information"],
-    ["stat", "Caractéristique"], ["usure", "Usure"], ["compteur", "Compteur de l'Ordre"], ["visite", "A déjà visité le passage"]
+    ["stat", "Caractéristique"], ["usure", "Usure"], ["compteur", "Compteur de l'Ordre"], ["visite", "A déjà visité le passage"], ["pasvisite", "N'a jamais visité le passage"]
   ];
   function condEditor(list, touch, rerender, title) {
     var box = h("div", { class: "sec" });
@@ -727,7 +727,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     }
     else if (c.type === "mot") row.appendChild(selectEl(catOpts("mots", "— Mot —"), c.val || "", set("val")));
     else if (c.type === "info" || c.type === "sansinfo") row.appendChild(selectEl(catOpts("infos", "— information —"), c.val || "", set("val")));
-    else if (c.type === "visite") row.appendChild(selectEl(passageOpts(), c.val || "", set("val")));
+    else if (c.type === "visite" || c.type === "pasvisite") row.appendChild(selectEl(passageOpts(), c.val || "", set("val")));
     else {
       if (c.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), c.stat || "for", set("stat")));
       row.appendChild(selectEl([[">=", "≥"], ["<=", "≤"], ["==", "="]], c.op || ">=", set("op")));
@@ -933,6 +933,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       case "info": return P.infos.indexOf(c.val) >= 0;
       case "sansinfo": return P.infos.indexOf(c.val) < 0;
       case "visite": return !!P.vus[c.val];
+      case "pasvisite": return !P.vus[c.val];
       case "stat": return cmp(eff(c.stat || "for"));
       case "usure": return cmp(P.usure);
       case "compteur": return cmp(P.compteur);
@@ -1453,7 +1454,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
           if (c.type === "objet" && c.val && !given.objets[c.val]) add("erreur", p, where + " demande « " + (D.objets[c.val] ? D.objets[c.val].nom : "?") + " », que rien ne donne.");
           if (c.type === "mot" && c.val && !given.mots[c.val]) add("erreur", p, where + " demande le « " + (D.mots[c.val] ? D.mots[c.val].nom : "?") + " », que rien n'apprend.");
           if (c.type === "info" && c.val && !given.infos[c.val]) add("erreur", p, where + " demande l'information « " + (D.infos[c.val] ? D.infos[c.val].nom : "?") + " », que rien ne donne.");
-          if (["objet", "sansobjet", "mot", "info", "sansinfo", "origine", "occupation", "visite"].indexOf(c.type) >= 0 && !c.val) add("attention", p, where + " a une condition incomplète.");
+          if (["objet", "sansobjet", "mot", "info", "sansinfo", "origine", "occupation", "visite", "pasvisite"].indexOf(c.type) >= 0 && !c.val) add("attention", p, where + " a une condition incomplète.");
         });
       }
       (p.segments || []).forEach(function (s, i) { if (i > 0) scanCond(s.cond, "Un bloc conditionnel"); });
@@ -1814,7 +1815,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   function condTxt(list) {
     return (list || []).map(function (c) {
       var lbl = (COND_TYPES.filter(function (t) { return t[0] === c.type; })[0] || [0, c.type])[1];
-      var v = c.type === "objet" || c.type === "sansobjet" ? (D.objets[c.val] || {}).nom : c.type === "mot" ? (D.mots[c.val] || {}).nom : c.type === "info" || c.type === "sansinfo" ? (D.infos[c.val] || {}).nom : c.type === "visite" ? (D.passages[c.val] || {}).num : c.type === "stat" ? STATS[c.stat || "for"] + " " + (c.op || ">=") + " " + c.n : c.type === "usure" || c.type === "compteur" ? (c.op || ">=") + " " + c.n : c.type === "genre" ? (c.val === "f" ? "féminin" : c.val === "n" ? "neutre" : "masculin") : c.val;
+      var v = c.type === "objet" || c.type === "sansobjet" ? (D.objets[c.val] || {}).nom : c.type === "mot" ? (D.mots[c.val] || {}).nom : c.type === "info" || c.type === "sansinfo" ? (D.infos[c.val] || {}).nom : c.type === "visite" || c.type === "pasvisite" ? (D.passages[c.val] || {}).num : c.type === "stat" ? STATS[c.stat || "for"] + " " + (c.op || ">=") + " " + c.n : c.type === "usure" || c.type === "compteur" ? (c.op || ">=") + " " + c.n : c.type === "genre" ? (c.val === "f" ? "féminin" : c.val === "n" ? "neutre" : "masculin") : c.val;
       return lbl + " " + (v == null ? "?" : v);
     }).join(" et ");
   }

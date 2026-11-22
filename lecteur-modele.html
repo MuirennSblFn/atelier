@@ -389,6 +389,7 @@ button { cursor: pointer; }
       case "info": return P.infos.indexOf(c.val) >= 0;
       case "sansinfo": return P.infos.indexOf(c.val) < 0;
       case "visite": return !!P.vus[c.val];
+      case "pasvisite": return !P.vus[c.val];
       case "stat": return cmp(eff(c.stat || "for"));
       case "usure": return cmp(P.usure);
       case "compteur": return cmp(P.compteur);
