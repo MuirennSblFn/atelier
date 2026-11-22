@@ -1778,7 +1778,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       if (is.type === "fin") out.push("- **" + (is.fin || "Fin") + "** : " + (is.titreFin || ""));
       out.push("");
     });
-    var d = new Date(), name = "kepultum-livre-" + (g === "f" ? "feminin" : g === "n" ? "neutre" : "masculin") + "-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".md";
+    var d = new Date(), name = "livre-prive-" + (g === "f" ? "feminin" : g === "n" ? "neutre" : "masculin") + "-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".md";
     downloads.save({ filename: name, data: out.join("\n") }).then(function () { msg.textContent = "Livre téléchargé."; }, function (e) { msg.textContent = e && e.code === "declined" ? "Téléchargement annulé." : "Le téléchargement n'est pas disponible ici."; });
   }
 
@@ -2013,7 +2013,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     GH.load().catch(function (e) { lastErr = e && e.status ? GH.explain(e.status) : "Impossible de joindre GitHub : vérifie ta connexion."; setStatus(); render(); });
   }
   function viewConnexion() {
-    var cfg = ghConfig() || { owner: "MuirennSblFn", repo: "kepultum-livre", branch: "main", token: "" };
+    var cfg = ghConfig() || { owner: "MuirennSblFn", repo: "livre-prive", branch: "main", token: "" };
     var box = h("section", { class: "box", style: "max-width:640px;margin:0 auto" }, h("div", { class: "box-h" }, h("h2", { text: "Connexion au dépôt du livre" })));
     var b = h("div", { class: "box-b" });
     b.appendChild(h("p", { class: "hint", text: "Ton livre est enregistré dans un dépôt GitHub privé. Indique-le ici, avec ton jeton d'accès : c'est à faire une seule fois par ordinateur. Le jeton reste dans ce navigateur." }));
