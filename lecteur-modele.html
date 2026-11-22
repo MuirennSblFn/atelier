@@ -319,10 +319,46 @@ button { cursor: pointer; }
     s.vigMax = s.for + 6 + (fav.indexOf("vig") >= 0 ? 2 : 0);
     s.manMax = s.sag + 2 + (fav.indexOf("man") >= 0 ? 2 : 0);
     s.vig = s.vigMax; s.man = s.manMax; s.cha = Math.floor(s.hab / 2);
-    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], vus: {}, cur: null, combat: null, test: null, fx: [], save: null, morts: 0, lus: 0 };
+    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], temp: [], vus: {}, cur: null, combat: null, test: null, fx: [], save: null, morts: 0, lus: 0 };
   }
   function equipes() { var out = []; if (!P) return out; ["arme", "armure", "talisman"].forEach(function (sl) { var id = P.eq[sl]; if (id && L.objets[id] && P.inv[id] > 0) out.push(L.objets[id]); }); return out; }
-  function bonus(k) { return equipes().reduce(function (n, o) { return n + (o.bonus_stat === k ? (+o.bonus_val || 0) : 0); }, 0); }
+  function bonus(k) { return equipes().reduce(function (n, o) { return n + (o.bonus_stat === k ? (+o.bonus_val || 0) : 0); }, 0) + tempB(k); }
+  /* Effets temporaires (objets) */
+  var TEMP_LBL = { for: "Force", hab: "Habileté", sag: "Sagesse", cha: "Chance", vigMax: "Vigueur max", manMax: "Mana max", armure: "Armure", parade: "Parade", degats: "Dégâts" };
+  function tempB(k) { return ((P && P.temp) || []).reduce(function (n, t) { return n + (t.stat === k ? t.n : 0); }, 0); }
+  function tempTxt(t, sansNom) {
+    var d = t.unite === "combat" ? "jusqu'à la fin du combat" : t.reste + " " + (t.unite === "tours" ? "tour" : "passage") + (t.reste > 1 ? "s" : "");
+    return (sansNom ? "" : t.nom + " : ") + (t.n >= 0 ? "+" : "−") + Math.abs(t.n) + " " + (TEMP_LBL[t.stat] || t.stat) + " (" + d + ")";
+  }
+  function tempTick(unite) {
+    var fin = [];
+    P.temp = (P.temp || []).filter(function (t) {
+      var stop = unite === "combat" ? (t.unite === "combat" || t.unite === "tours") : (t.unite === unite && --t.reste <= 0);
+      if (stop) fin.push(t.nom);
+      return !stop;
+    });
+    P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax"));
+    return fin.length ? ["Fin de l'effet : " + fin.join(", ")] : [];
+  }
+  function utiliser(id) {
+    var o = L.objets[id] || {}, out = [];
+    if (o.effet_stat) out = out.concat(appliquer([{ type: o.effet_stat === "usure" ? "usure" : "stat", stat: o.effet_stat, n: +o.effet_val || 0 }]));
+    if (o.temp_stat) {
+      P.temp = (P.temp || []).filter(function (t) { return t.id !== id; });
+      var t = { id: id, nom: o.nom || "Objet", stat: o.temp_stat, n: +o.temp_val || 0, unite: o.temp_duree || "combat", reste: Math.max(1, +o.temp_n || 1) };
+      P.temp.push(t); out.push(tempTxt(t, true));
+    }
+    if (o.consommable) appliquer([{ type: "retirer", val: id, n: 1 }]);
+    return out;
+  }
+  function effetObjet(o) {
+    var out = [];
+    if (o.effet_stat) out.push((o.effet_val > 0 ? "+" : "") + (o.effet_val || 0) + " " + (STATS[o.effet_stat] || o.effet_stat));
+    if (o.temp_stat) { var n = +o.temp_val || 0, u = o.temp_duree || "combat", k = Math.max(1, +o.temp_n || 1); out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + (TEMP_LBL[o.temp_stat] || o.temp_stat) + (u === "combat" ? " jusqu'à la fin du combat" : " pendant " + k + " " + (u === "tours" ? "tour" : "passage") + (k > 1 ? "s" : ""))); }
+    return out.join(", ");
+  }
+  function utilisable(o) { return !!(o && (o.effet_stat || o.temp_stat)); }
+
   function eff(k) {
     if (k === "vigMax") return P.s.vigMax + bonus("vigMax");
     if (k === "manMax") return P.s.manMax + bonus("manMax");
@@ -337,6 +373,8 @@ button { cursor: pointer; }
     if (a && P.inv[P.eq.arme]) { w.nom = a.nom; w.txt = a.arme_degats || w.txt; w.atk = a.arme_attaque || w.atk; }
     w.dmg = parseDice(w.txt);
     equipes().forEach(function (x) { w.armure += +x.bonus_armure || 0; w.parade += +x.bonus_parade || 0; });
+    w.armure += tempB("armure"); w.parade += tempB("parade");
+    if (tempB("degats")) { w.dmg = w.dmg.slice(); w.dmg[2] += tempB("degats"); w.txt += " " + (tempB("degats") > 0 ? "+" : "−") + Math.abs(tempB("degats")); }
     return w;
   }
   function condOk(c) {
@@ -392,7 +430,8 @@ button { cursor: pointer; }
     var p = L.passages[pid];
     P.combat = null; P.test = null;
     if (!p) { P.cur = pid; P.horsDemo = true; UI.ecran = "demofin"; sauver(); render(); return; }
-    P.horsDemo = false; P.cur = pid; P.fx = fxAvant || [];
+    var finTemp = P.cur && P.cur !== pid ? tempTick("passages") : [];
+    P.horsDemo = false; P.cur = pid; P.fx = (fxAvant || []).concat(finTemp);
     if (!P.vus[pid]) {
       P.fx = P.fx.concat(appliquer(p.effets));
       (p.segments || []).forEach(function (sg, i) { if (i > 0 && (sg.effets || []).length && tousOk(sg.cond)) P.fx = P.fx.concat(appliquer(sg.effets)); });
@@ -455,8 +494,7 @@ button { cursor: pointer; }
       }
     } else if (a.indexOf("obj:") === 0) {
       var oid = a.slice(4), o = L.objets[oid];
-      J.push(esc(o.nom) + " : " + appliquer([{ type: o.effet_stat === "usure" ? "usure" : "stat", stat: o.effet_stat, n: +o.effet_val || 0 }]).join(", "));
-      if (o.consommable) appliquer([{ type: "retirer", val: oid, n: 1 }]);
+      J.push(esc(o.nom) + " : " + esc(utiliser(oid).join(", ")));
       if (it !== "garde") blesse(coup());
     } else if (a === "frapper") {
       if (it === "lourd") { frappe(1, 0, "Tu frappes en premier"); if (c.vig > 0) blesse(coup()); }
@@ -475,9 +513,10 @@ button { cursor: pointer; }
       if (it === "garde") J.push("Il ne frappait pas : tour perdu."); else { J.push("Garde prudente."); blesse(coup(), true); }
     }
     c.journal.unshift("<b>Tour " + c.tour + " · " + INTENTS[it].toLowerCase() + "</b><br>" + J.join(" "));
-    if (c.vig <= 0) { c.fini = "victoire"; c.butin = appliquer((L.passages[P.cur].issue || {}).butin); }
+    if (c.vig <= 0) { c.fini = "victoire"; c.butin = appliquer((L.passages[P.cur].issue || {}).butin); var fe = tempTick("combat"); if (fe.length) c.journal.unshift(esc(fe.join(" "))); }
     else if (s.vig <= 0) { c.fini = "defaite"; mourir(); render(); return; }
     else {
+      var ft = tempTick("tours"); if (ft.length) c.journal.unshift(esc(ft.join(" ")));
       c.idx++; c.tour++;
       if (c.phase === 1 && lines(String(e.cycle2 || "").replace(/,/g, "\n")).length && c.vig <= c.max / 2) { c.phase = 2; c.idx = 0; c.journal.unshift('<span class="mag">' + esc(genre(e.phase || "Il change de rythme.")) + "</span>"); }
       tourSuivant(c);
@@ -644,6 +683,7 @@ button { cursor: pointer; }
     a.appendChild(h("div", { class: "numero", "aria-label": "Passage " + p.num }, h("span"), h("b", { text: p.num }), h("span")));
     var fx = (P.fx || []).filter(Boolean);
     if (fx.length) a.appendChild(h("p", { class: "gains", text: fx.join(" · ") }));
+    if ((P.temp || []).length) a.appendChild(h("p", { class: "gains", style: "opacity:.8", text: "En cours : " + P.temp.map(function (t) { return tempTxt(t); }).join(" · ") }));
     var r = h("div", { class: "recit", tabindex: "-1", "data-focus": true });
     (p.segments || []).forEach(function (sg, i) { if (i === 0 || tousOk(sg.cond)) r.insertAdjacentHTML("beforeend", riche(sg.texte)); });
     a.appendChild(r);
@@ -683,6 +723,7 @@ button { cursor: pointer; }
     gauche.appendChild(h("div", { class: "duel" },
       h("div", null, h("div", { class: "n" }, h("b", { text: e.nom || "Ennemi" })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * c.vig / c.max) + "%" })), h("small", { text: "Vigueur " + c.vig + " / " + c.max })),
       h("div", null, h("div", { class: "n" }, h("span", { style: "font-weight:700;font-size:18px", text: nomHeros() }), h("small", { text: w.nom.toLowerCase() + " · armure " + w.armure })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / Math.max(1, eff("vigMax"))) + "%" })), h("small", { text: "Vigueur " + s.vig + " / " + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }))));
+    if ((P.temp || []).length && c.fini !== "victoire") gauche.appendChild(h("p", { class: "gains", style: "margin:8px 0 0", text: "En cours : " + P.temp.map(function (t) { return tempTxt(t); }).join(" · ") }));
     if (c.fini === "victoire") {
       gauche.appendChild(h("div", { class: "victoire" }, h("p", { class: "ok", text: e.mort ? genre(e.mort) : "Ton adversaire s'effondre." }),
         (c.butin || []).length ? h("div", { class: "butin" }, h("span", { class: "label", text: "Butin" }), h("ul", null, c.butin.map(function (t) { return h("li", { text: t }); }))) : null,
@@ -699,7 +740,7 @@ button { cursor: pointer; }
       b("prudente", "Garde prudente", "moitié des dégâts");
       if (e.voile) b("observer", "Observer", c.observe ? "déjà tenté ce tour" : "Sagesse · " + eff("sag") + " ou moins", "obs", c.observe);
       P.mots.forEach(function (mid) { var m = L.mots[mid]; if (!m || m.effet === "recit") return; var manque = Math.max(0, (+m.cout || 0) - s.man); b("mot:" + mid, m.nom, (m.cout || 0) + " Mana" + (manque ? " · " + manque + " en Usure" : ""), "mot"); });
-      Object.keys(P.inv).forEach(function (oid) { var o = L.objets[oid]; if (!o || !o.effet_stat) return; b("obj:" + oid, o.nom, (o.effet_val > 0 ? "+" : "") + (o.effet_val || 0) + " " + (STATS[o.effet_stat] || o.effet_stat) + " · " + P.inv[oid] + " restant" + (P.inv[oid] > 1 ? "s" : "")); });
+      Object.keys(P.inv).forEach(function (oid) { var o = L.objets[oid]; if (!utilisable(o)) return; b("obj:" + oid, o.nom, effetObjet(o) + " · " + P.inv[oid] + " restant" + (P.inv[oid] > 1 ? "s" : "")); });
       gauche.appendChild(acts);
     }
     corps.appendChild(gauche);
@@ -729,16 +770,17 @@ button { cursor: pointer; }
       h("div", { class: "grille6", style: "grid-template-columns:repeat(2,minmax(0,1fr))", html: ["for", "hab", "sag", "cha"].map(function (k) { var bo = bonus(k); return "<div><b>" + eff(k) + (bo ? " <small class='mag' style='font-size:12px;font-weight:400'>" + (bo > 0 ? "+" : "") + bo + "</small>" : "") + "</b><span>" + STATS[k] + "</span></div>"; }).join("") }),
       h("div", { class: "usure-boite" }, h("div", { style: "display:flex;justify-content:space-between" }, h("span", { class: "titre-f", style: "color:var(--or);font-size:20px", text: "Usure" }), h("b", { style: "color:var(--or);font-size:22px", text: String(P.usure) })),
         h("p", { text: "Les années que la magie t'a prises. Elle ne redescend jamais." }))));
+    if ((P.temp || []).length) f.appendChild(h("section", null, h("p", { class: "label", text: "Effets en cours" }), P.temp.map(function (t) { return h("div", { class: "ligne" }, h("span", { text: tempTxt(t) })); })));
     var eq = h("section", null, h("p", { class: "label", text: "Équipement et sac" }));
     var w = arme(); eq.appendChild(h("div", { class: "ligne" }, h("span", null, h("b", { text: w.nom }), h("small", { text: "arme · " + w.txt + " · " + STATS[w.atk] })), h("span", { class: "pastille", text: "en main" })));
     var ids = Object.keys(P.inv);
     if (!ids.length) eq.appendChild(h("p", { class: "vide", text: "Ton sac est vide." }));
     ids.forEach(function (id) {
       var o = L.objets[id] || { nom: "?" }, sl = slotOf(o), on = sl && P.eq[sl] === id;
-      var desc = [o.categorie && o.categorie !== "divers" ? o.categorie : "", o.arme_degats || "", o.bonus_armure ? "armure +" + o.bonus_armure : "", o.bonus_stat ? (STATS[o.bonus_stat] || o.bonus_stat) + " +" + o.bonus_val : "", o.desc || ""].filter(Boolean).join(" · ");
+      var desc = [o.categorie && o.categorie !== "divers" ? o.categorie : "", o.arme_degats || "", o.bonus_armure ? "armure +" + o.bonus_armure : "", o.bonus_stat ? (STATS[o.bonus_stat] || TEMP_LBL[o.bonus_stat] || o.bonus_stat) + " +" + o.bonus_val : "", utilisable(o) ? effetObjet(o) : "", o.desc || ""].filter(Boolean).join(" · ");
       var act = null;
       if (sl) act = h("button", { class: "pastille", onclick: function () { if (on) delete P.eq[sl]; else P.eq[sl] = id; P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax")); sauver(); render(); } }, on ? "équipé" : "équiper");
-      else if (o.effet_stat) act = h("button", { class: "b-sec", style: "padding:5px 12px;font-size:14px", onclick: function () { appliquer([{ type: o.effet_stat === "usure" ? "usure" : "stat", stat: o.effet_stat, n: +o.effet_val || 0 }]); if (o.consommable) appliquer([{ type: "retirer", val: id, n: 1 }]); sauver(); render(); } }, "Utiliser");
+      else if (utilisable(o)) act = h("button", { class: "b-sec", style: "padding:5px 12px;font-size:14px", onclick: function () { P.fx = [o.nom + " : " + utiliser(id).join(", ")]; sauver(); render(); } }, "Utiliser");
       eq.appendChild(h("div", { class: "ligne" }, h("span", null, h("b", { text: o.nom + (P.inv[id] > 1 ? " ×" + P.inv[id] : "") }), desc ? h("small", { text: desc }) : null), act));
     });
     f.appendChild(eq);

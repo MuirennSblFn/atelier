@@ -854,8 +854,38 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     return out;
   }
   function bonus(k) {
-    return equipped().reduce(function (n, o) { return n + (o.bonus_stat === k ? (+o.bonus_val || 0) : 0); }, 0);
+    return equipped().reduce(function (n, o) { return n + (o.bonus_stat === k ? (+o.bonus_val || 0) : 0); }, 0) + tempB(k);
   }
+  /* Effets temporaires (objets) */
+  var TEMP_LBL = { for: "Force", hab: "Habileté", sag: "Sagesse", cha: "Chance", vigMax: "Vigueur max", manMax: "Mana max", armure: "Armure", parade: "Parade", degats: "Dégâts" };
+  function tempB(k) { return ((P && P.temp) || []).reduce(function (n, t) { return n + (t.stat === k ? t.n : 0); }, 0); }
+  function tempTxt(t, sansNom) {
+    var d = t.unite === "combat" ? "jusqu'à la fin du combat" : t.reste + " " + (t.unite === "tours" ? "tour" : "passage") + (t.reste > 1 ? "s" : "");
+    return (sansNom ? "" : t.nom + " : ") + (t.n >= 0 ? "+" : "−") + Math.abs(t.n) + " " + (TEMP_LBL[t.stat] || t.stat) + " (" + d + ")";
+  }
+  function tempTick(unite) {
+    var fin = [];
+    P.temp = (P.temp || []).filter(function (t) {
+      var stop = unite === "combat" ? (t.unite === "combat" || t.unite === "tours") : (t.unite === unite && --t.reste <= 0);
+      if (stop) fin.push(t.nom);
+      return !stop;
+    });
+    P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax"));
+    return fin.length ? ["Fin de l'effet : " + fin.join(", ")] : [];
+  }
+  function utiliser(id) {
+    var o = D.objets[id] || {}, out = [];
+    if (o.effet_stat) out = out.concat(applyFx([{ type: o.effet_stat === "usure" ? "usure" : "stat", stat: o.effet_stat, n: +o.effet_val || 0 }]));
+    if (o.temp_stat) {
+      P.temp = (P.temp || []).filter(function (t) { return t.id !== id; });
+      var t = { id: id, nom: o.nom || "Objet", stat: o.temp_stat, n: +o.temp_val || 0, unite: o.temp_duree || "combat", reste: Math.max(1, +o.temp_n || 1) };
+      P.temp.push(t); out.push(tempTxt(t, true));
+    }
+    if (o.consommable) applyFx([{ type: "retirer", val: id, n: 1 }]);
+    return out;
+  }
+  function utilisable(o) { return !!(o && (o.effet_stat || o.temp_stat)); }
+
   function eff(k) {
     if (k === "vigMax") return P.s.vigMax + bonus("vigMax");
     if (k === "manMax") return P.s.manMax + bonus("manMax");
@@ -873,7 +903,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     s.vigMax = s.for + 6 + (fav.indexOf("vig") >= 0 ? 2 : 0);
     s.manMax = s.sag + 2 + (fav.indexOf("man") >= 0 ? 2 : 0);
     s.vig = s.vigMax; s.man = s.manMax; s.cha = Math.floor(s.hab / 2);
-    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], vus: {}, cur: null, log: [], combat: null, test: null, start: null, save: null };
+    return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], temp: [], vus: {}, cur: null, log: [], combat: null, test: null, start: null, save: null };
   }
   function defaultSetup() {
     if (UI.setup) return UI.setup;
@@ -940,12 +970,14 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   }
   function enter(pid, first) {
     var p = D.passages[pid];
+    var finTemp = P.cur && P.cur !== pid ? tempTick("passages") : [];
     P.cur = pid; P.combat = null; P.test = null; P.fx = [];
     if (!p) return;
     if (!P.vus[pid]) {
       P.fx = applyFx(p.effets);
       (p.segments || []).forEach(function (sg, i) { if (i > 0 && (sg.effets || []).length && allOk(sg.cond)) P.fx = P.fx.concat(applyFx(sg.effets)); });
     }
+    if (finTemp.length) P.fx = (P.fx || []).concat(finTemp);
     P.vus[pid] = true;
     if (p.debutActe) { var snap = JSON.parse(JSON.stringify(P)); snap.save = null; snap.combat = null; snap.test = null; P.save = snap; P.fx = P.fx.concat(["Sauvegarde : début de l'acte"]); }
     if (p.issue && p.issue.type === "combat") P.combat = newCombat(p.issue.ennemi);
@@ -1008,13 +1040,11 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax")); rePv();
       } }, (on ? "✓ " : "Équiper : ") + o.nom);
     })));
-    var usable = Object.keys(P.inv).filter(function (k) { return D.objets[k] && D.objets[k].effet_stat; });
+    var usable = Object.keys(P.inv).filter(function (k) { return utilisable(D.objets[k]); });
     if (usable.length && P.s.vig > 0) b.appendChild(h("div", { class: "toolbar" }, usable.map(function (k) {
       var o = D.objets[k];
       return h("button", { class: "btn small", onclick: function () {
-        var fx = applyFx([{ type: o.effet_stat === "usure" ? "usure" : "stat", stat: o.effet_stat, n: +o.effet_val || 0 }]);
-        if (o.consommable) applyFx([{ type: "retirer", val: k, n: 1 }]);
-        P.fx = [o.nom + " utilisé : " + fx.join(", ")];
+        P.fx = [o.nom + " utilisé : " + utiliser(k).join(", ")];
         var el = document.getElementById("previewBox"); el.replaceWith(previewPanel());
       } }, "Utiliser : " + o.nom);
     })));
@@ -1026,6 +1056,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     page.appendChild(h("div", { class: "pv-num", text: p.num || "?" }));
     if (p.image) page.appendChild(h("img", { class: "pv-img", src: imgSrc(p.image), "data-img": p.image, alt: "" }));
     if (P.fx && P.fx.length) page.appendChild(h("div", { class: "pv-fx", text: P.fx.join(" · ") }));
+    if ((P.temp || []).length) page.appendChild(h("div", { class: "pv-fx", text: "En cours : " + P.temp.map(function (t) { return tempTxt(t); }).join(" · ") }));
     var text = h("div", { class: "pv-text" });
     (p.segments || []).forEach(function (sg, i) {
       if (i > 0 && !allOk(sg.cond)) return;
@@ -1110,6 +1141,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var a = P.eq && P.eq.arme && D.objets[P.eq.arme];
     if (a && P.inv[P.eq.arme]) { w.nom = a.nom; w.txt = a.arme_degats || w.txt; w.dmg = parseDice(w.txt); w.atk = a.arme_attaque || w.atk; }
     equipped().forEach(function (x) { w.armure += +x.bonus_armure || 0; w.parade += +x.bonus_parade || 0; });
+    w.armure += tempB("armure"); w.parade += tempB("parade");
+    if (tempB("degats")) { w.dmg = w.dmg.slice(); w.dmg[2] += tempB("degats"); w.txt += " " + (tempB("degats") > 0 ? "+" : "−") + Math.abs(tempB("degats")); }
     return w;
   }
   function combatView(is) {
@@ -1204,9 +1237,10 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else { L.push("Garde prudente."); hurt(foeHit(), true); }
     }
     c.log.unshift("<b>Tour " + c.turn + " · " + INTENTS[it] + "</b> · " + L.join(" "));
-    if (c.vig <= 0) { c.over = "win"; c.butin = applyFx(is.butin); }
+    if (c.vig <= 0) { c.over = "win"; c.butin = applyFx(is.butin); var fe = tempTick("combat"); if (fe.length) c.log.unshift(fe.join(" ")); }
     else if (s.vig <= 0) c.over = "lose";
     else {
+      var ft = tempTick("tours"); if (ft.length) c.log.unshift(ft.join(" "));
       c.idx++; c.turn++;
       if (c.phase === 1 && lines(String(e.cycle2 || "").replace(/,/g, "\n")).length && c.vig <= c.max / 2) {
         c.phase = 2; c.idx = 0;
@@ -1477,7 +1511,9 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ] },
     objets: { titre: "Objets", un: "un objet", fields: [
       ["nom", "Nom", "text"], ["categorie", "Catégorie", "catsel"], ["desc", "Description", "area"], ["poids", "Poids (Capacité de port)", "number"], ["consommable", "Consommable", "bool"],
-      ["effet_stat", "Effet à l'utilisation", "statsel"], ["effet_val", "Valeur de l'effet", "number"],
+      ["effet_stat", "Effet immédiat à l'utilisation", "statsel"], ["effet_val", "Valeur de l'effet immédiat", "number"],
+      ["temp_stat", "Effet temporaire : caractéristique", "tempsel"], ["temp_val", "Effet temporaire : valeur (négative = malus)", "number"],
+      ["temp_duree", "Effet temporaire : durée", "dureesel"], ["temp_n", "Effet temporaire : nombre de tours ou de passages", "number"],
       ["arme_degats", "Arme : dégâts (ex. : 1d6+2)", "text"], ["arme_attaque", "Arme : caractéristique d'attaque", "atksel"],
       ["bonus_armure", "Équipé : bonus d'armure", "number"], ["bonus_parade", "Équipé : bonus de parade", "number"],
       ["bonus_stat", "Équipé : caractéristique améliorée", "bonussel"], ["bonus_val", "Équipé : valeur du bonus", "number"],
@@ -1533,6 +1569,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else if (f[2] === "bool") el = h("input", { type: "checkbox", checked: !!cur[k], onchange: function (e) { cur[k] = e.target.checked; touch(); } });
       else if (f[2] === "statsel") el = selectEl([["", "aucun"]].concat(Object.keys(STATS).map(function (s) { return [s, STATS[s]]; })), cur[k] || "", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "catsel") el = selectEl([["divers", "Divers"], ["arme", "Arme (s'équipe)"], ["armure", "Armure (s'équipe)"], ["talisman", "Talisman (s'équipe)"]], cur[k] || "divers", function (v) { cur[k] = v; touch(); render(); });
+      else if (f[2] === "tempsel") el = selectEl([["", "aucun"]].concat(Object.keys(TEMP_LBL).map(function (x) { return [x, TEMP_LBL[x]]; })), cur[k] || "", function (v) { cur[k] = v; touch(); });
+      else if (f[2] === "dureesel") el = selectEl([["combat", "Jusqu'à la fin du combat (le prochain, s'il est bu avant)"], ["tours", "Un nombre de tours de combat"], ["passages", "Un nombre de passages"]], cur[k] || "combat", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "atksel") el = selectEl([["for", "Force"], ["hab", "Habileté"]], cur[k] || "for", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "bonussel") el = selectEl([["", "aucune"], ["for", "Force"], ["hab", "Habileté"], ["sag", "Sagesse"], ["cha", "Chance"], ["vigMax", "Vigueur maximum"], ["manMax", "Mana maximum"]], cur[k] || "", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "motsel") el = selectEl([["annule", "Annule l'action de l'ennemi"], ["degats", "Inflige des dégâts (ignore la Défense)"], ["soin", "Rend de la Vigueur"], ["recit", "Aucun : seulement dans le récit"]], cur[k] || "recit", function (v) { cur[k] = v; touch(); });
@@ -1872,6 +1910,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>Les objets, Mots, informations et ennemis</b> se créent dans leurs onglets, puis se choisissent dans des listes. Une « information », c'est ce que le joueur a découvert : un indice, un nom, un secret (l'équivalent des mots-codes).</p>",
       "<p><b>L'aperçu</b> joue ton livre avec le vrai moteur. Change de genre, d'origine ou d'occupation pour vérifier tes variations.</p>",
       "<p><b>Les vérifications</b> listent les impasses, les liens cassés, les passages inaccessibles et les objets, Mots ou informations demandés mais jamais donnés. Définis ton passage de départ dans les Réglages pour qu'elles soient complètes.</p>",
+      "<p><b>Les effets temporaires :</b> un objet utilisable peut donner un bonus (ou un malus) qui ne dure qu'un temps : jusqu'à la fin du combat, pendant quelques tours de combat, ou pendant quelques passages (le passage où on l'utilise compte pour un). Exemple : une potion de rage, +3 aux dégâts jusqu'à la fin du combat. Chaque objet porte un seul effet temporaire. Un objet peut aussi cumuler un effet immédiat (soin) et un effet temporaire. Réutiliser le même objet relance sa durée, sans cumuler.</p>",
       "<p><b>Le butin :</b> dans un passage qui se termine par un combat, la carte « Butin » liste ce que le joueur récupère s'il gagne (objets, or, Mots, informations). Il le découvre dans la fenêtre de combat, avant « Continuer ».</p>",
       "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",
       "<p><b>La sauvegarde par acte :</b> coche « Début d'acte » sur le premier passage de chaque acte. Quand le joueur meurt, il y revient avec l'état qu'il avait en arrivant.</p>",
