@@ -890,6 +890,14 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     if (o.consommable) applyFx([{ type: "retirer", val: id, n: 1 }]);
     return out;
   }
+
+  /* Capacité de port */
+  function capacite() {
+    var base = P.s.cp != null ? +P.s.cp : P.s.for + 3, plus = 0;
+    Object.keys(P.inv).forEach(function (id) { var o = D.objets[id]; if (o && +o.bonus_cp) plus += (+o.bonus_cp) * P.inv[id]; });
+    return base + plus + bonus("cp");
+  }
+  function poidsTotal() { var t = 0; Object.keys(P.inv).forEach(function (id) { var o = D.objets[id]; if (o) t += (+o.poids || 0) * P.inv[id]; }); return t; }
   function utilisable(o) { return !!(o && (o.effet_stat || o.temp_stat)); }
 
   function eff(k) {
@@ -908,6 +916,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ["for", "hab", "sag"].forEach(function (k) { if (fav.indexOf(k) >= 0) s[k] += 2; });
     s.vigMax = s.for + 6 + (fav.indexOf("vig") >= 0 ? 2 : 0);
     s.manMax = s.sag + 2 + (fav.indexOf("man") >= 0 ? 2 : 0);
+    s.cp = s.for + 3 + (fav.indexOf("cp") >= 0 ? 2 : 0);
     s.vig = s.vigMax; s.man = s.manMax; s.cha = Math.floor(s.hab / 2);
     return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], frag: [], temp: [], vus: {}, cur: null, log: [], combat: null, test: null, start: null, save: null };
   }
@@ -1044,7 +1053,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var s = P.s;
     if (play) b.appendChild(h("div", { class: "hint", text: heroName() + " · " + (P.setup.genre === "f" ? "héroïne" : P.setup.genre === "n" ? "iel" : "héros") + " · " + (P.setup.origine || "") + " · " + (P.setup.occupation || "") }));
     b.appendChild(h("div", { class: "pv-stats", html:
-      "Vigueur <b>" + s.vig + "/" + eff("vigMax") + "</b> Mana <b>" + s.man + "/" + eff("manMax") + "</b> For <b>" + eff("for") + "</b> Hab <b>" + eff("hab") + "</b> Sag <b>" + eff("sag") + "</b> Chance <b>" + eff("cha") + "</b>" + (P.lumOn ? ' <span style="color:' + ((s.lum || 0) <= 3 ? '#a3321f' : '#9a6b12') + '">Lumière <b>' + (s.lum || 0) + "/" + LUMMAX() + "</b></span>" : "") + " Usure <b>" + P.usure + "</b>" + (play ? "" : " Compteur <b>" + P.compteur + "</b>") }));
+      "Vigueur <b>" + s.vig + "/" + eff("vigMax") + "</b> Mana <b>" + s.man + "/" + eff("manMax") + "</b> For <b>" + eff("for") + "</b> Hab <b>" + eff("hab") + "</b> Sag <b>" + eff("sag") + "</b> Chance <b>" + eff("cha") + "</b>" + (P.lumOn ? ' <span style="color:' + ((s.lum || 0) <= 3 ? '#a3321f' : '#9a6b12') + '">Lumière <b>' + (s.lum || 0) + "/" + LUMMAX() + "</b></span>" : "") + ' <span style="color:' + (poidsTotal() > capacite() ? '#a3321f' : 'inherit') + '">Sac <b>' + poidsTotal() + "/" + capacite() + "</b></span>" + " Usure <b>" + P.usure + "</b>" + (play ? "" : " Compteur <b>" + P.compteur + "</b>") }));
     var w0 = weapon();
     b.appendChild(h("div", { class: "pv-inv", text: "Arme : " + w0.nom + " (" + w0.txt + ", " + STATS[w0.atk] + ") · armure " + w0.armure + (w0.parade ? " · parade +" + w0.parade : "") }));
     var inv = Object.keys(P.inv).map(function (k) { return (D.objets[k] ? D.objets[k].nom : "?") + (P.inv[k] > 1 ? " ×" + P.inv[k] : ""); });
@@ -1531,7 +1540,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       ["phase", "Phrase du changement de phase", "area"], ["mort", "Phrase de mort", "area"], ["notes", "Notes", "area"]
     ] },
     objets: { titre: "Objets", un: "un objet", fields: [
-      ["nom", "Nom", "text"], ["categorie", "Catégorie", "catsel"], ["desc", "Description", "area"], ["poids", "Poids (Capacité de port)", "number"], ["consommable", "Consommable", "bool"],
+      ["nom", "Nom", "text"], ["categorie", "Catégorie", "catsel"], ["desc", "Description", "area"], ["poids", "Poids (Capacité de port)", "number"], ["bonus_cp", "Capacité de port en plus tant qu'il est dans le sac (sacoche, besace…)", "number"], ["consommable", "Consommable", "bool"],
       ["effet_stat", "Effet immédiat à l'utilisation", "statsel"], ["effet_val", "Valeur de l'effet immédiat", "number"],
       ["temp_stat", "Effet temporaire : caractéristique", "tempsel"], ["temp_val", "Effet temporaire : valeur (négative = malus)", "number"],
       ["temp_duree", "Effet temporaire : durée", "dureesel"], ["temp_n", "Effet temporaire : nombre de tours ou de passages", "number"],
@@ -1598,7 +1607,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else if (f[2] === "tempsel") el = selectEl([["", "aucun"]].concat(Object.keys(TEMP_LBL).map(function (x) { return [x, TEMP_LBL[x]]; })), cur[k] || "", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "dureesel") el = selectEl([["combat", "Jusqu'à la fin du combat (le prochain, s'il est bu avant)"], ["tours", "Un nombre de tours de combat"], ["passages", "Un nombre de passages"]], cur[k] || "combat", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "atksel") el = selectEl([["for", "Force"], ["hab", "Habileté"]], cur[k] || "for", function (v) { cur[k] = v; touch(); });
-      else if (f[2] === "bonussel") el = selectEl([["", "aucune"], ["for", "Force"], ["hab", "Habileté"], ["sag", "Sagesse"], ["cha", "Chance"], ["vigMax", "Vigueur maximum"], ["manMax", "Mana maximum"]], cur[k] || "", function (v) { cur[k] = v; touch(); });
+      else if (f[2] === "bonussel") el = selectEl([["", "aucune"], ["for", "Force"], ["hab", "Habileté"], ["sag", "Sagesse"], ["cha", "Chance"], ["vigMax", "Vigueur maximum"], ["manMax", "Mana maximum"], ["cp", "Capacité de port"]], cur[k] || "", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "motsel") el = selectEl([["annule", "Annule l'action de l'ennemi"], ["degats", "Inflige des dégâts (ignore la Défense)"], ["soin", "Rend de la Vigueur"], ["recit", "Aucun : seulement dans le récit"]], cur[k] || "recit", function (v) { cur[k] = v; touch(); });
       if (f[2] === "longarea") el = h("textarea", { value: cur[k] || "", rows: 16, style: "min-height:320px;font-family:Georgia,serif;font-size:15px;font-weight:400;line-height:1.55", oninput: function (e) { cur[k] = e.target.value; touch(); } });
       var wide = f[2] === "area" || f[2] === "longarea";
@@ -1944,6 +1953,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>Les effets temporaires :</b> un objet utilisable peut donner un bonus (ou un malus) qui ne dure qu'un temps : jusqu'à la fin du combat, pendant quelques tours de combat, ou pendant quelques passages (le passage où on l'utilise compte pour un). Exemple : une potion de rage, +3 aux dégâts jusqu'à la fin du combat. Chaque objet porte un seul effet temporaire. Un objet peut aussi cumuler un effet immédiat (soin) et un effet temporaire. Réutiliser le même objet relance sa durée, sans cumuler.</p>",
       "<p><b>Les fragments de lore :</b> des textes à collectionner (une page de journal, une lettre, une légende) que le joueur range dans son Carnet et relit quand il veut, même depuis la page de titre. Écris-les dans l'onglet Fragments ; donne-les avec l'effet « Trouver le fragment de lore » (à l'entrée d'un passage, sur un choix, ou en butin). Les fragments d'une même collection sont regroupés et triés par leur ordre ; ceux pas encore trouvés apparaissent comme « ? ? ? ». Un fragment trouvé le reste, même après une mort ou une nouvelle partie.</p>",
       "<p><b>La lumière :</b> l'effet « Allumer la lumière » fait apparaître la jauge (10 points par défaut, réglable dans Réglages). Elle perd 1 point à chaque passage où le joueur entre ensuite (un retour en arrière compte aussi). À 0, le joueur meurt dans le noir, sauf si le passage est une fin. Pour la recharger : effet « Caractéristique » → Lumière +6 (bougie), +3 (bout de chandelle), +1 (allumette), à l'entrée du passage où on la trouve ; ou un objet à effet immédiat Lumière si tu veux que le joueur la garde pour plus tard. Une recharge trouvée dans le passage où la jauge tombe à 0 sauve le joueur. « Éteindre la jauge de lumière » l'arrête (sortie à l'air libre). La condition « Caractéristique » → Lumière permet aussi des choix du type « si ta lanterne brûle encore assez ».</p>",
+      "<p><b>La Capacité de port :</b> chaque héros porte (Force + 3) points de poids, +2 si son occupation favorise le Port. Le poids d'un objet compte tant qu'il est dans le sac, multiplié par le nombre d'exemplaires. Une sacoche ou une besace augmente la capacité grâce au champ « Capacité de port en plus » : elle compte tant que le joueur la possède, sans l'équiper. Si le sac déborde, le jeu bloque la suite jusqu'à ce que le joueur choisisse ce qu'il laisse sur place.</p>",
       "<p><b>Le butin :</b> dans un passage qui se termine par un combat, la carte « Butin » liste ce que le joueur récupère s'il gagne (objets, or, Mots, informations). Il le découvre dans la fenêtre de combat, avant « Continuer ».</p>",
       "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",
       "<p><b>La sauvegarde par acte :</b> coche « Début d'acte » sur le premier passage de chaque acte. Quand le joueur meurt, il y revient avec l'état qu'il avait en arrivant.</p>",

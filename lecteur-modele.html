@@ -328,6 +328,7 @@ button { cursor: pointer; }
     ["for", "hab", "sag"].forEach(function (k) { if (fav.indexOf(k) >= 0) s[k] += 2; });
     s.vigMax = s.for + 6 + (fav.indexOf("vig") >= 0 ? 2 : 0);
     s.manMax = s.sag + 2 + (fav.indexOf("man") >= 0 ? 2 : 0);
+    s.cp = s.for + 3 + (fav.indexOf("cp") >= 0 ? 2 : 0);
     s.vig = s.vigMax; s.man = s.manMax; s.cha = Math.floor(s.hab / 2);
     return { setup: setup, s: s, usure: 0, compteur: 0, inv: {}, eq: {}, mots: [], infos: [], frag: [], temp: [], vus: {}, cur: null, combat: null, test: null, fx: [], save: null, morts: 0, lus: 0 };
   }
@@ -367,6 +368,14 @@ button { cursor: pointer; }
     if (o.temp_stat) { var n = +o.temp_val || 0, u = o.temp_duree || "combat", k = Math.max(1, +o.temp_n || 1); out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + (TEMP_LBL[o.temp_stat] || o.temp_stat) + (u === "combat" ? " jusqu'à la fin du combat" : " pendant " + k + " " + (u === "tours" ? "tour" : "passage") + (k > 1 ? "s" : ""))); }
     return out.join(", ");
   }
+
+  /* Capacité de port */
+  function capacite() {
+    var base = P.s.cp != null ? +P.s.cp : P.s.for + 3, plus = 0;
+    Object.keys(P.inv).forEach(function (id) { var o = L.objets[id]; if (o && +o.bonus_cp) plus += (+o.bonus_cp) * P.inv[id]; });
+    return base + plus + bonus("cp");
+  }
+  function poidsTotal() { var t = 0; Object.keys(P.inv).forEach(function (id) { var o = L.objets[id]; if (o) t += (+o.poids || 0) * P.inv[id]; }); return t; }
   function utilisable(o) { return !!(o && (o.effet_stat || o.temp_stat)); }
 
   function eff(k) {
@@ -566,7 +575,8 @@ button { cursor: pointer; }
     app.innerHTML = ""; calque.innerHTML = "";
     var f = { titre: ecranTitre, prologue: ecranPrologue, creation: ecranCreation, jeu: ecranJeu, mort: ecranMort, fin: ecranFin, demofin: ecranDemoFin }[UI.ecran] || ecranTitre;
     app.appendChild(f());
-    if (UI.modal === "fiche") calque.appendChild(modalFiche());
+    if (UI.ecran === "jeu" && P && !P.combat && poidsTotal() > capacite()) calque.appendChild(modalSac());
+    else if (UI.modal === "fiche") calque.appendChild(modalFiche());
     else if (UI.modal === "regles") calque.appendChild(modalRegles());
     else if (UI.modal === "fins") calque.appendChild(modalFins());
     else if (UI.modal === "carnet") calque.appendChild(modalCarnet());
@@ -803,6 +813,19 @@ button { cursor: pointer; }
     return v;
   }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && UI.modal) fermer(); });
+  function modalSac() {
+    var corps = h("div", { class: "corps" });
+    corps.appendChild(h("p", { class: "recit", style: "margin-top:0", text: "Ton sac est trop lourd : " + poidsTotal() + " pour " + capacite() + " de capacité. Choisis ce que tu laisses ici pour pouvoir repartir." }));
+    var ul = h("div");
+    Object.keys(P.inv).forEach(function (id) {
+      var o = L.objets[id]; if (!o || !(+o.poids)) return;
+      ul.appendChild(h("div", { class: "ligne" }, h("span", null, h("b", { text: o.nom }), h("small", { text: " ×" + P.inv[id] + " · poids " + o.poids + (+o.bonus_cp ? " · +" + o.bonus_cp + " de capacité" : "") })),
+        h("button", { class: "b-sec", style: "padding:5px 12px;font-size:14px", onclick: function () { appliquer([{ type: "retirer", val: id, n: 1 }]); sauver(); render(); } }, "Laisser")));
+    });
+    corps.appendChild(ul);
+    return h("div", { class: "voile" }, h("section", { class: "fenetre", role: "dialog", "aria-modal": "true", "aria-label": "Sac trop lourd", style: "max-width:560px" },
+      h("header", null, h("h2", { class: "titre-f", text: "Sac trop lourd" })), corps));
+  }
   function modalFiche() {
     var s = P.s, f = h("div", { class: "corps fiche" });
     f.appendChild(h("section", null, h("p", { class: "label", text: "Caractéristiques" }),
@@ -811,7 +834,7 @@ button { cursor: pointer; }
       h("div", { class: "usure-boite" }, h("div", { style: "display:flex;justify-content:space-between" }, h("span", { class: "titre-f", style: "color:var(--or);font-size:20px", text: "Usure" }), h("b", { style: "color:var(--or);font-size:22px", text: String(P.usure) })),
         h("p", { text: "Les années que la magie t'a prises. Elle ne redescend jamais." }))));
     if ((P.temp || []).length) f.appendChild(h("section", null, h("p", { class: "label", text: "Effets en cours" }), P.temp.map(function (t) { return h("div", { class: "ligne" }, h("span", { text: tempTxt(t) })); })));
-    var eq = h("section", null, h("p", { class: "label", text: "Équipement et sac" }));
+    var eq = h("section", null, h("p", { class: "label", text: "Équipement et sac · " + poidsTotal() + " / " + capacite() + " de poids" }));
     var w = arme(); eq.appendChild(h("div", { class: "ligne" }, h("span", null, h("b", { text: w.nom }), h("small", { text: "arme · " + w.txt + " · " + STATS[w.atk] })), h("span", { class: "pastille", text: "en main" })));
     var ids = Object.keys(P.inv);
     if (!ids.length) eq.appendChild(h("p", { class: "vide", text: "Ton sac est vide." }));
