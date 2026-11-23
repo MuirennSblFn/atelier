@@ -189,6 +189,8 @@ button { cursor: pointer; }
 .dé { display: inline-flex; align-items: center; justify-content: center; min-width: 1.7em; height: 1.7em; padding: 0 3px; border: 1.5px solid currentColor; border-radius: 4px; font-weight: 700; margin-right: 4px; }
 .victoire { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
 .victoire p { margin: 0; font-family: var(--police-recit); font-size: 19px; }
+.engager { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-top: 6px; }
+.engager .label { color: var(--sang-clair); }
 .butin { border: 1px solid var(--trait); border-radius: 6px; padding: 10px 14px; background: var(--surface); }
 .butin ul { margin: 6px 0 0; padding-left: 18px; font-family: var(--police-recit); font-size: 17px; }
 
@@ -736,7 +738,7 @@ img, .illus { image-rendering: pixelated; }
     else if (UI.modal === "fins") calque.appendChild(modalFins());
     else if (UI.modal === "carnet") calque.appendChild(modalCarnet());
     else if (UI.modal === "menu") calque.appendChild(modalMenu());
-    else if (UI.ecran === "jeu" && P && P.combat && !P.combat.manque) calque.appendChild(fenetreCombat());
+    else if (UI.ecran === "jeu" && P && P.combat && !P.combat.manque && (P.combat.engage || (P.combat.journal || []).length)) calque.appendChild(fenetreCombat());
     var focus = calque.querySelector("[data-focus]") || app.querySelector("[data-focus]");
     if (focus) focus.focus({ preventScroll: true });
   }
@@ -918,6 +920,11 @@ img, .illus { image-rendering: pixelated; }
       else a.appendChild(h("nav", { class: "choix" }, h("button", { "data-focus": true, onclick: function () { aller(t.ok ? is.succes : is.echec); } }, "Continuer")));
     } else if (is.type === "combat") {
       if (P.combat && P.combat.manque) a.appendChild(h("p", { class: "vide", text: "(Combat sans ennemi : passage à compléter dans l'atelier.)" }));
+      else if (P.combat && !P.combat.engage && !(P.combat.journal || []).length) {
+        var en = ennemi(P.combat.eid) || {};
+        a.appendChild(h("div", { class: "engager" }, h("button", { class: "b-prim", onclick: function () { P.combat.engage = true; sauver(); render(); } }, "Engager le combat"),
+          h("span", { class: "label", text: (en.nom || "Ennemi") + " · pas de fuite possible" })));
+      }
     }
     return w;
   }
