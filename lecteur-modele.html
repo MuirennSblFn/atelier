@@ -130,6 +130,10 @@ button { cursor: pointer; }
 .jauge .j { display: block; width: 100px; height: 7px; background: var(--trait-doux); border-radius: 4px; overflow: hidden; }
 .jauge .j i { display: block; height: 100%; background: var(--sang); transition: width .4s; }
 .jauge.mana .j i { background: var(--thanergie); }
+.jauge.lum .j i { background: var(--lumiere, #c9973a); }
+.jauge.lum.bas .j i { background: var(--sang); animation: vacille 1.6s ease-in-out infinite; }
+.jauge.lum.bas b { color: #d4553d; }
+@keyframes vacille { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 .usure b { color: var(--or); }
 .lecture { flex: 1; width: 100%; max-width: var(--largeur-lecture); margin: 0 auto; display: flex; flex-direction: column; gap: 18px; padding-block: 26px 48px; }
 .illus { width: 100%; border-radius: 6px; display: block; }
@@ -228,7 +232,7 @@ button { cursor: pointer; }
   .jauge .j { width: 70px; }
   :root { --taille-recit: 18px; }
 }
-@media (prefers-reduced-motion: reduce) { .de.roule { animation: none; } .jauge .j i, .duel .j i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .de.roule, .jauge.lum.bas .j i { animation: none; } .jauge .j i, .duel .j i { transition: none; } }
 </style>
 </head>
 <body>
@@ -242,7 +246,8 @@ button { cursor: pointer; }
   var R = L.reglages || {};
   R.origines = R.origines || []; R.occupations = R.occupations || [];
   L.passages = L.passages || {}; L.objets = L.objets || {}; L.mots = L.mots || {}; L.infos = L.infos || {}; L.fragments = L.fragments || {}; L.ennemis = L.ennemis || {};
-  var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance" };
+  var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance", lum: "Lumière" };
+  function LUMMAX() { return Math.max(1, +R.lumMax || 10); }
   var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
   var EXPL = { for: "Frapper, parer, forcer une porte.", hab: "Esquiver, grimper, se faufiler.", sag: "Percevoir, comprendre, lire les gestes d'un ennemi." };
   var ACTES = ["", "I", "II", "III"];
@@ -427,9 +432,13 @@ button { cursor: pointer; }
         var k = f.stat || "vig";
         if (k === "vig") P.s.vig = Math.max(0, Math.min(eff("vigMax"), P.s.vig + n));
         else if (k === "man") P.s.man = Math.max(0, Math.min(eff("manMax"), P.s.man + n));
+        else if (k === "lum") P.s.lum = Math.max(0, Math.min(LUMMAX(), (P.s.lum || 0) + n));
         else P.s[k] = Math.max(0, P.s[k] + n);
         out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
-      } else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure");
+      }
+      else if (f.type === "lumiere_on") { P.lumOn = true; P.s.lum = Math.min(LUMMAX(), f.n == null ? LUMMAX() : Math.max(0, +f.n || 0)); out.push("Lumière : " + P.s.lum + " / " + LUMMAX()); }
+      else if (f.type === "lumiere_off") { if (P.lumOn) out.push("Tu n'as plus besoin de lumière"); P.lumOn = false; }
+      else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure");
       } else if (f.type === "lancer" && f.val) {
         var lm = L.mots[f.val] || {}, cout = +lm.cout || 0, paye = Math.min(cout, P.s.man), reste = cout - paye;
         P.s.man -= paye; P.usure += reste;
@@ -447,6 +456,7 @@ button { cursor: pointer; }
     P.combat = null; P.test = null;
     if (!p) { P.cur = pid; P.horsDemo = true; UI.ecran = "demofin"; sauver(); render(); return; }
     var finTemp = P.cur && P.cur !== pid ? tempTick("passages") : [];
+    if (P.lumOn && P.cur && P.cur !== pid) P.s.lum = Math.max(0, (P.s.lum || 0) - 1);
     P.horsDemo = false; P.cur = pid; P.fx = (fxAvant || []).concat(finTemp);
     if (!P.vus[pid]) {
       P.fx = P.fx.concat(appliquer(p.effets));
@@ -460,10 +470,11 @@ button { cursor: pointer; }
     if (is.type === "fin") { UI.ecran = "fin"; noterFin(pid); }
     else UI.ecran = "jeu";
     if (P.s.vig <= 0) mourir();
+    else if (P.lumOn && (P.s.lum || 0) <= 0 && is.type !== "fin") mourir("noir");
     sauver(); render(); window.scrollTo(0, 0);
   }
   function aller(pid, fx, garderFrag) { if (!garderFrag) UI.fragNouv = []; var pre = appliquer(fx); entrer(pid, pre); }
-  function mourir() { P.morts++; UI.ecran = "mort"; sauver(); }
+  function mourir(cause) { P.morts++; P.causeMort = cause || null; UI.ecran = "mort"; sauver(); }
   function noterFin(pid) { var f = load(":fins") || []; if (f.indexOf(pid) < 0) { f.push(pid); store(":fins", f); } }
   function fragsTrouves() { return (load(":fragments") || []).filter(function (k) { return L.fragments[k]; }); }
   function tousFrags() {
@@ -578,7 +589,7 @@ button { cursor: pointer; }
     nav.appendChild(h("button", { class: "b-prim", "data-focus": true, onclick: function () { UI.setup = null; UI.etape = 1; UI.ecran = String(R.prologue || "").trim() ? "prologue" : "creation"; render(); } }, "Nouvelle partie"));
     var pp = partie && partie.cur ? L.passages[partie.cur] : null;
     if (partie && partie.cur && !(pp && (pp.issue || {}).type === "fin")) {
-      nav.appendChild(h("button", { class: "b-sec", onclick: function () { P = partie; UI.ecran = P.horsDemo ? "demofin" : P.s.vig <= 0 ? "mort" : pp && (pp.issue || {}).type === "fin" ? "fin" : "jeu"; render(); } },
+      nav.appendChild(h("button", { class: "b-sec", onclick: function () { P = partie; UI.ecran = P.horsDemo ? "demofin" : (P.s.vig <= 0 || P.causeMort === "noir") ? "mort" : pp && (pp.issue || {}).type === "fin" ? "fin" : "jeu"; render(); } },
         h("span", { text: "Continuer" }), h("small", { text: [nomActe(pp && pp.acte), pp ? "passage " + pp.num : "", partie.setup.nom || ""].filter(Boolean).join(" · ") })));
     }
     nav.appendChild(h("div", { style: "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px" },
@@ -696,6 +707,7 @@ button { cursor: pointer; }
       h("div", { class: "stats" },
         h("span", { class: "jauge", title: "Vigueur" }, h("span", { class: "t", text: "Vigueur" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / Math.max(1, vm)) + "%" })), h("b", { text: s.vig + " / " + vm })),
         h("span", { class: "jauge mana", title: "Mana" }, h("span", { class: "t", text: "Mana" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.man / Math.max(1, mm)) + "%" })), h("b", { text: String(s.man) })),
+        P.lumOn ? h("span", { class: "jauge lum" + ((s.lum || 0) <= 3 ? " bas" : ""), title: "Lumière : tu perds 1 point à chaque passage" }, h("span", { class: "t", text: "Lumière" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * (s.lum || 0) / LUMMAX()) + "%" })), h("b", { text: (s.lum || 0) + "/" + LUMMAX() })) : null,
         h("span", { class: "usure" }, h("span", { class: "t", style: "color:var(--texte-doux)", text: "Usure " }), h("b", { text: String(P.usure) })),
         h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.modal = "fiche"; render(); } }, "Fiche"),
         Object.keys(L.fragments).length ? h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.fragLu = null; UI.modal = "carnet"; render(); } }, "Carnet") : null,
@@ -872,7 +884,9 @@ button { cursor: pointer; }
   function ecranMort() {
     var p = L.passages[P.cur] || {}, c = P.combat, e = c && ennemi(c.eid);
     var s = h("main", { class: "ecran-mort pad" });
-    s.appendChild(h("h1", { class: "titre-f", text: "Tu tombes" }));
+    var noir = P.causeMort === "noir";
+    s.appendChild(h("h1", { class: "titre-f", text: noir ? "Les ténèbres t'engloutissent" : "Tu tombes" }));
+    if (noir) s.appendChild(h("p", { class: "recit", style: "max-width:560px;text-align:center;margin:0 auto", html: riche(R.mortNoir || "La dernière flamme vacille, puis s'éteint. Dans le noir absolu de Képultum, tu ne retrouveras jamais ton chemin.") }));
     s.appendChild(h("p", { style: "margin:0;font-size:15px;color:#8a8090", text: ["Passage " + p.num, e ? e.nom + (c.tour ? ", au " + c.tour + "e tour" : "") : "", "Usure " + P.usure].filter(Boolean).join(" · ") }));
     var nav = h("div", { class: "menu" });
     if (P.save) nav.appendChild(h("button", { class: "b-prim", "data-focus": true, style: "flex-direction:column;gap:3px", onclick: reprendreActe }, h("span", { text: "Reprendre au début de l'acte" + (P.save.cur && L.passages[P.save.cur] && ACTES[+L.passages[P.save.cur].acte] ? " " + ACTES[+L.passages[P.save.cur].acte] : "") }), h("small", { style: "font-weight:400;font-size:13.5px;color:#4a4035", text: "Tu y reviens avec ce que tu avais en y arrivant." })));

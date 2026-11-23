@@ -235,7 +235,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   /* =====================================================================
      Données et constantes
      ===================================================================== */
-  var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance" };
+  var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance", lum: "Lumière" };
+  function LUMMAX() { return Math.max(1, +(R().lumMax) || 10); }
   var TEST_STATS = ["for", "hab", "sag", "cha"];
   var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
   var STATUTS = { afaire: "À écrire", brouillon: "Brouillon", ecrit: "Écrit", relu: "Relu" };
@@ -740,7 +741,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   /* Effets */
   var FX_TYPES = [
     ["donner", "Donner l'objet"], ["retirer", "Retirer l'objet"], ["mot", "Apprendre le Mot"],
-    ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["fragment", "Trouver le fragment de lore"], ["stat", "Modifier une caractéristique"],
+    ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["lumiere_on", "Allumer la lumière (la jauge démarre)"], ["lumiere_off", "Éteindre la jauge de lumière (plus besoin)"], ["fragment", "Trouver le fragment de lore"], ["stat", "Modifier une caractéristique"],
     ["lancer", "Prononcer le Mot (coûte son Mana)"], ["usure", "Ajouter de l'Usure"], ["compteur", "Avancer le compteur de l'Ordre"]
   ];
   function fxEditor(list, touch, rerender) {
@@ -756,6 +757,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       } else if (f.type === "mot" || f.type === "lancer") row.appendChild(selectEl(catOpts("mots", "— Mot —"), f.val || "", set("val")));
       else if (f.type === "fragment") row.appendChild(selectEl(catOpts("fragments", "— fragment —"), f.val || "", set("val")));
       else if (f.type === "info" || f.type === "oubli") row.appendChild(selectEl(catOpts("infos", "— information —"), f.val || "", set("val")));
+      else if (f.type === "lumiere_off") row.appendChild(h("span", { class: "hint", text: "La jauge disparaît et ne baisse plus." }));
+      else if (f.type === "lumiere_on") row.appendChild(h("label", { class: "f inline" }, "points de départ", h("input", { type: "number", min: 1, value: f.n == null ? LUMMAX() : f.n, oninput: function (e) { f.n = e.target.value === "" ? null : +e.target.value; touch(); } })));
       else {
         if (f.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), f.stat || "vig", set("stat")));
         row.appendChild(h("input", { type: "number", value: f.n == null ? (f.type === "stat" ? -1 : 1) : f.n, oninput: function (e) { f.n = +e.target.value; touch(); } }));
@@ -966,9 +969,12 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         var k = f.stat || "vig";
         if (k === "vig") P.s.vig = Math.max(0, Math.min(eff("vigMax"), P.s.vig + n));
         else if (k === "man") P.s.man = Math.max(0, Math.min(eff("manMax"), P.s.man + n));
+        else if (k === "lum") P.s.lum = Math.max(0, Math.min(LUMMAX(), (P.s.lum || 0) + n));
         else P.s[k] = Math.max(0, P.s[k] + n);
         out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
       }
+      else if (f.type === "lumiere_on") { P.lumOn = true; P.s.lum = Math.min(LUMMAX(), f.n == null ? LUMMAX() : Math.max(0, +f.n || 0)); out.push("Lumière : " + P.s.lum + " / " + LUMMAX()); }
+      else if (f.type === "lumiere_off") { if (P.lumOn) out.push("Tu n'as plus besoin de lumière"); P.lumOn = false; }
       else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure"); }
       else if (f.type === "lancer" && f.val) {
         var lm = D.mots[f.val] || {}, cout = +lm.cout || 0, paye = Math.min(cout, P.s.man), reste = cout - paye;
@@ -983,6 +989,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   function enter(pid, first) {
     var p = D.passages[pid];
     var finTemp = P.cur && P.cur !== pid ? tempTick("passages") : [];
+    if (P.lumOn && P.cur && P.cur !== pid) P.s.lum = Math.max(0, (P.s.lum || 0) - 1);
     P.cur = pid; P.combat = null; P.test = null; P.fx = [];
     if (!p) return;
     if (!P.vus[pid]) {
@@ -1037,7 +1044,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var s = P.s;
     if (play) b.appendChild(h("div", { class: "hint", text: heroName() + " · " + (P.setup.genre === "f" ? "héroïne" : P.setup.genre === "n" ? "iel" : "héros") + " · " + (P.setup.origine || "") + " · " + (P.setup.occupation || "") }));
     b.appendChild(h("div", { class: "pv-stats", html:
-      "Vigueur <b>" + s.vig + "/" + eff("vigMax") + "</b> Mana <b>" + s.man + "/" + eff("manMax") + "</b> For <b>" + eff("for") + "</b> Hab <b>" + eff("hab") + "</b> Sag <b>" + eff("sag") + "</b> Chance <b>" + eff("cha") + "</b> Usure <b>" + P.usure + "</b>" + (play ? "" : " Compteur <b>" + P.compteur + "</b>") }));
+      "Vigueur <b>" + s.vig + "/" + eff("vigMax") + "</b> Mana <b>" + s.man + "/" + eff("manMax") + "</b> For <b>" + eff("for") + "</b> Hab <b>" + eff("hab") + "</b> Sag <b>" + eff("sag") + "</b> Chance <b>" + eff("cha") + "</b>" + (P.lumOn ? ' <span style="color:' + ((s.lum || 0) <= 3 ? '#a3321f' : '#9a6b12') + '">Lumière <b>' + (s.lum || 0) + "/" + LUMMAX() + "</b></span>" : "") + " Usure <b>" + P.usure + "</b>" + (play ? "" : " Compteur <b>" + P.compteur + "</b>") }));
     var w0 = weapon();
     b.appendChild(h("div", { class: "pv-inv", text: "Arme : " + w0.nom + " (" + w0.txt + ", " + STATS[w0.atk] + ") · armure " + w0.armure + (w0.parade ? " · parade +" + w0.parade : "") }));
     var inv = Object.keys(P.inv).map(function (k) { return (D.objets[k] ? D.objets[k].nom : "?") + (P.inv[k] > 1 ? " ×" + P.inv[k] : ""); });
@@ -1079,8 +1086,9 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     if (!text.textContent.trim()) text.appendChild(h("p", { class: "hint", text: "(Passage sans texte pour l'instant.)" }));
     page.appendChild(text);
 
-    if (P.s.vig <= 0) {
-      page.appendChild(h("div", { class: "pv-end" }, h("h4", { class: "ko", text: "Tu meurs" }),
+    var noir = P.lumOn && (P.s.lum || 0) <= 0 && (p.issue || {}).type !== "fin";
+    if (P.s.vig <= 0 || noir) {
+      page.appendChild(h("div", { class: "pv-end" }, h("h4", { class: "ko", text: noir ? "Plus de lumière : tu meurs dans le noir" : "Tu meurs" }),
         P.save ? h("button", { class: "btn primary", onclick: function () { var sv = P.save; P = JSON.parse(JSON.stringify(sv)); P.save = sv; enter(P.cur); P.vus[P.cur] = true; rePv(); } }, "Reprendre au début de l'acte")
           : h("p", { class: "hint", text: "Aucun passage « début d'acte » n'a été traversé : coche cette case sur le premier passage de chaque acte pour activer la sauvegarde." })));
       return box;
@@ -1645,6 +1653,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     b.appendChild(h("div", { class: "row" },
       h("label", { class: "f grow" }, "Titre du livre", h("input", { type: "text", value: r.titre || "", oninput: function (e) { r.titre = e.target.value; touch(); } })),
       h("label", { class: "f inline" }, h("input", { type: "checkbox", checked: r.neutre !== false, onchange: function (e) { r.neutre = e.target.checked; rerender(); } }), "Proposer le genre neutre (iel)"),
+      h("label", { class: "f", style: "max-width:220px" }, "Jauge de lumière : maximum", h("input", { type: "number", min: 1, value: r.lumMax || 10, oninput: function (e) { r.lumMax = +e.target.value || 10; touch(); } })),
       h("label", { class: "f" }, "Nom du héros si le joueur n'en donne pas", h("input", { type: "text", value: r.nomDefaut || "", placeholder: "Voyageur", oninput: function (e) { r.nomDefaut = e.target.value; touch(); } })),
       h("label", { class: "f grow" }, "Passage de départ", selectEl(passageOpts("— aucun —"), r.depart || "", function (v) { r.depart = v; touch(); }))));
     b.appendChild(h("div", { class: "row" },
@@ -1779,6 +1788,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     });
     t2.appendChild(tb2);
     b.appendChild(h("div", { class: "tbl-wrap" }, t2));
+    b.appendChild(h("label", { class: "f" }, "Mort par l'obscurité (jauge de lumière à 0)", h("textarea", { value: r.mortNoir || "", placeholder: "La dernière flamme vacille, puis s'éteint. Dans le noir absolu de Képultum, tu ne retrouveras jamais ton chemin.", oninput: function (e) { r.mortNoir = e.target.value; touch(); } })));
     b.appendChild(h("label", { class: "f" }, "Message de fin de démo (quand le joueur atteint un passage non inclus)", h("textarea", { value: r.finDemo || "", placeholder: "Merci d'avoir joué ! Ton avis compte : dis à l'auteur ce qui t'a plu, ce qui t'a perdu, et ce que tu aurais voulu faire.", oninput: function (e) { r.finDemo = e.target.value; touch(); } })));
 
     box.appendChild(b);
@@ -1933,6 +1943,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>Les vérifications</b> listent les impasses, les liens cassés, les passages inaccessibles et les objets, Mots ou informations demandés mais jamais donnés. Définis ton passage de départ dans les Réglages pour qu'elles soient complètes.</p>",
       "<p><b>Les effets temporaires :</b> un objet utilisable peut donner un bonus (ou un malus) qui ne dure qu'un temps : jusqu'à la fin du combat, pendant quelques tours de combat, ou pendant quelques passages (le passage où on l'utilise compte pour un). Exemple : une potion de rage, +3 aux dégâts jusqu'à la fin du combat. Chaque objet porte un seul effet temporaire. Un objet peut aussi cumuler un effet immédiat (soin) et un effet temporaire. Réutiliser le même objet relance sa durée, sans cumuler.</p>",
       "<p><b>Les fragments de lore :</b> des textes à collectionner (une page de journal, une lettre, une légende) que le joueur range dans son Carnet et relit quand il veut, même depuis la page de titre. Écris-les dans l'onglet Fragments ; donne-les avec l'effet « Trouver le fragment de lore » (à l'entrée d'un passage, sur un choix, ou en butin). Les fragments d'une même collection sont regroupés et triés par leur ordre ; ceux pas encore trouvés apparaissent comme « ? ? ? ». Un fragment trouvé le reste, même après une mort ou une nouvelle partie.</p>",
+      "<p><b>La lumière :</b> l'effet « Allumer la lumière » fait apparaître la jauge (10 points par défaut, réglable dans Réglages). Elle perd 1 point à chaque passage où le joueur entre ensuite (un retour en arrière compte aussi). À 0, le joueur meurt dans le noir, sauf si le passage est une fin. Pour la recharger : effet « Caractéristique » → Lumière +6 (bougie), +3 (bout de chandelle), +1 (allumette), à l'entrée du passage où on la trouve ; ou un objet à effet immédiat Lumière si tu veux que le joueur la garde pour plus tard. Une recharge trouvée dans le passage où la jauge tombe à 0 sauve le joueur. « Éteindre la jauge de lumière » l'arrête (sortie à l'air libre). La condition « Caractéristique » → Lumière permet aussi des choix du type « si ta lanterne brûle encore assez ».</p>",
       "<p><b>Le butin :</b> dans un passage qui se termine par un combat, la carte « Butin » liste ce que le joueur récupère s'il gagne (objets, or, Mots, informations). Il le découvre dans la fenêtre de combat, avant « Continuer ».</p>",
       "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",
       "<p><b>La sauvegarde par acte :</b> coche « Début d'acte » sur le premier passage de chaque acte. Quand le joueur meurt, il y revient avec l'état qu'il avait en arrivant.</p>",
