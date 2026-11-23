@@ -742,7 +742,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   /* Effets */
   var FX_TYPES = [
     ["donner", "Donner l'objet"], ["retirer", "Retirer l'objet"], ["mot", "Apprendre le Mot"],
-    ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["lumiere_on", "Allumer la lumière (la jauge démarre)"], ["lumiere_off", "Éteindre la jauge de lumière (plus besoin)"], ["fragment", "Trouver le fragment de lore"], ["stat", "Modifier une caractéristique"],
+    ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["lumiere_on", "Allumer la lanterne (jauge pleine la 1re fois, puis reprend où elle en était)"], ["lumiere_off", "Éteindre la lanterne (la jauge s'arrête et garde sa valeur)"], ["fragment", "Trouver le fragment de lore"], ["stat", "Modifier une caractéristique"],
     ["lancer", "Prononcer le Mot (coûte son Mana)"], ["usure", "Ajouter de l'Usure"], ["compteur", "Avancer le compteur de l'Ordre"]
   ];
   function fxEditor(list, touch, rerender) {
@@ -758,8 +758,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       } else if (f.type === "mot" || f.type === "lancer") row.appendChild(selectEl(catOpts("mots", "— Mot —"), f.val || "", set("val")));
       else if (f.type === "fragment") row.appendChild(selectEl(catOpts("fragments", "— fragment —"), f.val || "", set("val")));
       else if (f.type === "info" || f.type === "oubli") row.appendChild(selectEl(catOpts("infos", "— information —"), f.val || "", set("val")));
-      else if (f.type === "lumiere_off") row.appendChild(h("span", { class: "hint", text: "La jauge disparaît et ne baisse plus." }));
-      else if (f.type === "lumiere_on") row.appendChild(h("label", { class: "f inline" }, "points de départ", h("input", { type: "number", min: 1, value: f.n == null ? LUMMAX() : f.n, oninput: function (e) { f.n = e.target.value === "" ? null : +e.target.value; touch(); } })));
+      else if (f.type === "lumiere_off") row.appendChild(h("span", { class: "hint", text: "La jauge s'arrête et garde sa valeur jusqu'au prochain « Allumer »." }));
+      else if (f.type === "lumiere_on") row.appendChild(h("label", { class: "f inline" }, "points (vide = plein la 1re fois, puis reprise)", h("input", { type: "number", min: 1, value: f.n == null ? "" : f.n, placeholder: "plein", oninput: function (e) { f.n = e.target.value === "" ? null : +e.target.value; touch(); } })));
       else {
         if (f.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), f.stat || "vig", set("stat")));
         row.appendChild(h("input", { type: "number", value: f.n == null ? (f.type === "stat" ? -1 : 1) : f.n, oninput: function (e) { f.n = +e.target.value; touch(); } }));
@@ -1008,8 +1008,11 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         else P.s[k] = Math.max(0, P.s[k] + n);
         out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
       }
-      else if (f.type === "lumiere_on") { P.lumOn = true; P.s.lum = Math.min(LUMMAX(), f.n == null ? LUMMAX() : Math.max(0, +f.n || 0)); out.push("Lumière : " + P.s.lum + " / " + LUMMAX()); }
-      else if (f.type === "lumiere_off") { if (P.lumOn) out.push("Tu n'as plus besoin de lumière"); P.lumOn = false; }
+      else if (f.type === "lumiere_on") {
+        if (f.n == null && P.lumDeja) { if (!P.lumOn) out.push("Lanterne rallumée : Lumière " + (P.s.lum || 0) + " / " + LUMMAX()); P.lumOn = true; }
+        else { P.lumOn = true; P.lumDeja = true; P.s.lum = Math.min(LUMMAX(), f.n == null ? LUMMAX() : Math.max(0, +f.n || 0)); out.push("Lumière : " + P.s.lum + " / " + LUMMAX()); }
+      }
+      else if (f.type === "lumiere_off") { if (P.lumOn) out.push("Lanterne éteinte : il te reste " + (P.s.lum || 0) + " / " + LUMMAX() + " de lumière"); P.lumOn = false; }
       else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure"); }
       else if (f.type === "lancer" && f.val) {
         var lm = D.mots[f.val] || {}, cout = +lm.cout || 0, paye = Math.min(cout, P.s.man), reste = cout - paye;
@@ -1994,7 +1997,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>Les vérifications</b> listent les impasses, les liens cassés, les passages inaccessibles et les objets, Mots ou informations demandés mais jamais donnés. Définis ton passage de départ dans les Réglages pour qu'elles soient complètes.</p>",
       "<p><b>Les effets temporaires :</b> un objet utilisable peut donner un bonus (ou un malus) qui ne dure qu'un temps : jusqu'à la fin du combat, pendant quelques tours de combat, ou pendant quelques passages (le passage où on l'utilise compte pour un). Exemple : une potion de rage, +3 aux dégâts jusqu'à la fin du combat. Chaque objet porte un seul effet temporaire. Un objet peut aussi cumuler un effet immédiat (soin) et un effet temporaire. Réutiliser le même objet relance sa durée, sans cumuler.</p>",
       "<p><b>Les fragments de lore :</b> des textes à collectionner (une page de journal, une lettre, une légende) que le joueur range dans son Carnet et relit quand il veut, même depuis la page de titre. Écris-les dans l'onglet Fragments ; donne-les avec l'effet « Trouver le fragment de lore » (à l'entrée d'un passage, sur un choix, ou en butin). Les fragments d'une même collection sont regroupés et triés par leur ordre ; ceux pas encore trouvés apparaissent comme « ? ? ? ». Un fragment trouvé le reste, même après une mort ou une nouvelle partie.</p>",
-      "<p><b>La lumière :</b> l'effet « Allumer la lumière » fait apparaître la jauge (10 points par défaut, réglable dans Réglages). Elle perd 1 point à chaque passage où le joueur entre ensuite (un retour en arrière compte aussi). À 0, le joueur meurt dans le noir, sauf si le passage est une fin. Pour la recharger : effet « Caractéristique » → Lumière +6 (bougie), +3 (bout de chandelle), +1 (allumette), à l'entrée du passage où on la trouve ; ou un objet à effet immédiat Lumière si tu veux que le joueur la garde pour plus tard. Une recharge trouvée dans le passage où la jauge tombe à 0 sauve le joueur. « Éteindre la jauge de lumière » l'arrête (sortie à l'air libre). La condition « Caractéristique » → Lumière permet aussi des choix du type « si ta lanterne brûle encore assez ».</p>",
+      "<p><b>La lumière :</b> l'effet « Allumer la lanterne » fait apparaître la jauge (10 points par défaut, réglable dans Réglages). Elle perd 1 point à chaque passage où le joueur entre ensuite (un retour en arrière compte aussi). À 0, le joueur meurt dans le noir, sauf si le passage est une fin. Pour la recharger : effet « Caractéristique » → Lumière +6 (bougie), +3 (bout de chandelle), +1 (allumette), à l'entrée du passage où on la trouve ; ou un objet à effet immédiat Lumière si tu veux que le joueur la garde pour plus tard. Une recharge trouvée dans le passage où la jauge tombe à 0 sauve le joueur. « Éteindre la lanterne » arrête la jauge sans la vider, et « Allumer la lanterne » la fait repartir là où elle en était (seule la toute première fois la remplit). Exemple : « Allumer » sur le choix qui descend dans la crypte, « Éteindre » sur le choix qui remonte. La condition « Caractéristique » → Lumière permet aussi des choix du type « si ta lanterne brûle encore assez ».</p>",
       "<p><b>La Capacité de port :</b> chaque héros porte (Force + 3) points de poids, +2 si son occupation favorise le Port. Le poids d'un objet compte tant qu'il est dans le sac, multiplié par le nombre d'exemplaires. Une sacoche ou une besace augmente la capacité grâce au champ « Capacité de port en plus » : elle compte tant que le joueur la possède, sans l'équiper. Si le sac déborde, le jeu bloque la suite jusqu'à ce que le joueur choisisse ce qu'il laisse sur place.</p>",
       "<p><b>Le butin :</b> dans un passage qui se termine par un combat, la carte « Butin » liste ce que le joueur récupère s'il gagne (objets, or, Mots, informations). Il le découvre dans la fenêtre de combat, avant « Continuer ».</p>",
       "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",

@@ -596,8 +596,11 @@ img, .illus { image-rendering: pixelated; }
         else P.s[k] = Math.max(0, P.s[k] + n);
         out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
       }
-      else if (f.type === "lumiere_on") { P.lumOn = true; P.s.lum = Math.min(LUMMAX(), f.n == null ? LUMMAX() : Math.max(0, +f.n || 0)); out.push("Lumière : " + P.s.lum + " / " + LUMMAX()); }
-      else if (f.type === "lumiere_off") { if (P.lumOn) out.push("Tu n'as plus besoin de lumière"); P.lumOn = false; }
+      else if (f.type === "lumiere_on") {
+        if (f.n == null && P.lumDeja) { if (!P.lumOn) out.push("Lanterne rallumée : Lumière " + (P.s.lum || 0) + " / " + LUMMAX()); P.lumOn = true; }
+        else { P.lumOn = true; P.lumDeja = true; P.s.lum = Math.min(LUMMAX(), f.n == null ? LUMMAX() : Math.max(0, +f.n || 0)); out.push("Lumière : " + P.s.lum + " / " + LUMMAX()); }
+      }
+      else if (f.type === "lumiere_off") { if (P.lumOn) out.push("Lanterne éteinte : il te reste " + (P.s.lum || 0) + " / " + LUMMAX() + " de lumière"); P.lumOn = false; }
       else if (f.type === "usure") { P.usure += n; out.push("+" + n + " Usure");
       } else if (f.type === "lancer" && f.val) {
         var lm = L.mots[f.val] || {}, cout = +lm.cout || 0, paye = Math.min(cout, P.s.man), reste = cout - paye;
