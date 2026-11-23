@@ -376,6 +376,32 @@ button { cursor: pointer; }
     return base + plus + bonus("cp");
   }
   function poidsTotal() { var t = 0; Object.keys(P.inv).forEach(function (id) { var o = L.objets[id]; if (o) t += (+o.poids || 0) * P.inv[id]; }); return t; }
+
+  /* Équipement automatique : jamais une arme ou une armure plus faible */
+  function moyenneDes(txt) { var d = parseDice(txt); return d[0] * (d[1] + 1) / 2 + d[2]; }
+  function equipAuto(id, o) {
+    var sl = slotOf(o); if (!sl) return "";
+    var cur = P.eq[sl] && P.inv[P.eq[sl]] ? L.objets[P.eq[sl]] : null;
+    if (sl === "arme") {
+      var base = cur ? cur.arme_degats : (occOf(P.setup.occupation) || {}).degats;
+      if (moyenneDes(o.arme_degats || "1d6") >= moyenneDes(base || "1d6")) { P.eq.arme = id; return " · en main"; }
+      return " · dans ton sac (ton arme actuelle frappe plus fort)";
+    }
+    if (sl === "armure") {
+      if (!cur || (+o.bonus_armure || 0) + (+o.bonus_parade || 0) > (+cur.bonus_armure || 0) + (+cur.bonus_parade || 0)) { P.eq.armure = id; return " · porté"; }
+      return " · dans ton sac (à équiper depuis ta fiche)";
+    }
+    if (!cur) { P.eq[sl] = id; return " · porté"; }
+    return " · dans ton sac (à équiper depuis ta fiche)";
+  }
+  function secoursLumiere() {
+    if (!P.lumOn || (P.s.lum || 0) > 0) return null;
+    var id = Object.keys(P.inv).filter(function (k) { var o = L.objets[k]; return o && o.effet_stat === "lum" && P.inv[k] > 0; })
+      .sort(function (a, b) { return (+L.objets[b].effet_val || 0) - (+L.objets[a].effet_val || 0); })[0];
+    if (!id) return null;
+    var nom = L.objets[id].nom; utiliser(id);
+    return "Ta lanterne allait s'éteindre : tu y glisses in extremis " + nom + " (Lumière " + P.s.lum + ")";
+  }
   function utilisable(o) { return !!(o && (o.effet_stat || o.temp_stat)); }
 
   function eff(k) {
@@ -416,15 +442,14 @@ button { cursor: pointer; }
     }
     return true;
   }
-  function tousOk(list) { return (list || []).every(condOk); }
+  function tousOk(list, ou) { list = list || []; return ou && list.length ? list.some(condOk) : list.every(condOk); }
   function appliquer(list) {
     var out = [];
     (list || []).forEach(function (f) {
       var n = f.n == null ? 1 : +f.n, o;
       if (f.type === "donner" && f.val) {
         P.inv[f.val] = (P.inv[f.val] || 0) + (n || 1); o = L.objets[f.val];
-        out.push("+ " + (o ? o.nom : "objet") + (n > 1 ? " ×" + n : ""));
-        var sl = slotOf(o); if (sl && !P.eq[sl]) P.eq[sl] = f.val;
+        out.push("+ " + (o ? o.nom : "objet") + (n > 1 ? " ×" + n : "") + (o ? equipAuto(f.val, o) : "") + (o && o.effet_stat === "lum" ? " · à allumer depuis ta fiche" : ""));
       } else if (f.type === "retirer" && f.val) {
         P.inv[f.val] = Math.max(0, (P.inv[f.val] || 0) - (n || 1));
         if (!P.inv[f.val]) { delete P.inv[f.val]; Object.keys(P.eq).forEach(function (k) { if (P.eq[k] === f.val) delete P.eq[k]; }); }
@@ -469,7 +494,7 @@ button { cursor: pointer; }
     P.horsDemo = false; P.cur = pid; P.fx = (fxAvant || []).concat(finTemp);
     if (!P.vus[pid]) {
       P.fx = P.fx.concat(appliquer(p.effets));
-      (p.segments || []).forEach(function (sg, i) { if (i > 0 && (sg.effets || []).length && tousOk(sg.cond)) P.fx = P.fx.concat(appliquer(sg.effets)); });
+      (p.segments || []).forEach(function (sg, i) { if (i > 0 && (sg.effets || []).length && tousOk(sg.cond, sg.ou)) P.fx = P.fx.concat(appliquer(sg.effets)); });
       P.lus++;
     }
     P.vus[pid] = true;
@@ -478,6 +503,7 @@ button { cursor: pointer; }
     if (is.type === "combat") P.combat = nouveauCombat(is.ennemi);
     if (is.type === "fin") { UI.ecran = "fin"; noterFin(pid); }
     else UI.ecran = "jeu";
+    var secours = secoursLumiere(); if (secours) P.fx = (P.fx || []).concat(secours);
     if (P.s.vig <= 0) mourir();
     else if (P.lumOn && (P.s.lum || 0) <= 0 && is.type !== "fin") mourir("noir");
     sauver(); render(); window.scrollTo(0, 0);
@@ -735,13 +761,13 @@ button { cursor: pointer; }
     (UI.fragNouv || []).forEach(function (fid) { if (L.fragments[fid]) a.appendChild(h("button", { class: "b-sec frag-nouv", onclick: function () { UI.fragLu = fid; UI.modal = "carnet"; render(); } }, "Lire « " + L.fragments[fid].nom + " »")); });
     if ((P.temp || []).length) a.appendChild(h("p", { class: "gains", style: "opacity:.8", text: "En cours : " + P.temp.map(function (t) { return tempTxt(t); }).join(" · ") }));
     var r = h("div", { class: "recit", tabindex: "-1", "data-focus": true });
-    (p.segments || []).forEach(function (sg, i) { if (i === 0 || tousOk(sg.cond)) r.insertAdjacentHTML("beforeend", riche(sg.texte)); });
+    (p.segments || []).forEach(function (sg, i) { if (i === 0 || tousOk(sg.cond, sg.ou)) r.insertAdjacentHTML("beforeend", riche(sg.texte)); });
     a.appendChild(r);
     var is = p.issue || {};
     if (is.type === "choix") {
       var nav = h("nav", { class: "choix", "aria-label": "Choix" }), n = 0;
       (is.choix || []).forEach(function (c) {
-        var ok = tousOk(c.cond);
+        var ok = tousOk(c.cond, c.ou);
         if (!ok && (c.affichage || "cache") === "cache") return;
         n++;
         if (ok && c.cible) nav.appendChild(h("button", { onclick: function () { aller(c.cible, c.effets); } }, genre(c.texte || "…")));
@@ -789,7 +815,7 @@ button { cursor: pointer; }
       b("parer", "Parer", "Force · " + tv(t.parer));
       b("prudente", "Garde prudente", "moitié des dégâts");
       if (e.voile) b("observer", "Observer", c.observe ? "déjà tenté ce tour" : "Sagesse · " + eff("sag") + " ou moins", "obs", c.observe);
-      P.mots.forEach(function (mid) { var m = L.mots[mid]; if (!m || m.effet === "recit") return; var manque = Math.max(0, (+m.cout || 0) - s.man); b("mot:" + mid, m.nom, (m.cout || 0) + " Mana" + (manque ? " · " + manque + " en Usure" : ""), "mot"); });
+      P.mots.forEach(function (mid) { var m = L.mots[mid]; if (!m || !m.effet || m.effet === "recit") return; var manque = Math.max(0, (+m.cout || 0) - s.man); b("mot:" + mid, m.nom, (m.cout || 0) + " Mana" + (manque ? " · " + manque + " en Usure" : ""), "mot"); });
       Object.keys(P.inv).forEach(function (oid) { var o = L.objets[oid]; if (!utilisable(o)) return; b("obj:" + oid, o.nom, effetObjet(o) + " · " + P.inv[oid] + " restant" + (P.inv[oid] > 1 ? "s" : "")); });
       gauche.appendChild(acts);
     }
@@ -926,7 +952,7 @@ button { cursor: pointer; }
       h("p", { class: "label " + bon, style: "letter-spacing:.28em", text: is.fin || "Fin" }),
       h("h1", { class: "titre-f", text: genre(is.titreFin || is.fin || "Fin") }),
       (function () { var o = ornement(); o.style.justifyContent = "flex-start"; return o; })(),
-      h("div", { class: "recit", tabindex: "-1", "data-focus": true, html: (p.segments || []).map(function (sg, i) { return i === 0 || tousOk(sg.cond) ? riche(sg.texte) : ""; }).join("") }),
+      h("div", { class: "recit", tabindex: "-1", "data-focus": true, html: (p.segments || []).map(function (sg, i) { return i === 0 || tousOk(sg.cond, sg.ou) ? riche(sg.texte) : ""; }).join("") }),
       h("div", { style: "display:flex;flex-wrap:wrap;gap:10px;margin-top:8px" },
         h("button", { class: "b-prim", onclick: function () { UI.setup = null; UI.etape = 1; UI.ecran = "creation"; render(); } }, "Rejouer avec un autre personnage"),
         h("button", { class: "b-sec", onclick: function () { UI.ecran = "titre"; render(); } }, "Menu principal")));

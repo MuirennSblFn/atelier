@@ -609,7 +609,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       } else {
         txt.appendChild(h("div", { class: "card cond" },
           h("div", { class: "sec-h" }, h("strong", { text: "Bloc conditionnel" }), h("button", { class: "btn small danger", onclick: function () { p.segments.splice(i, 1); rerender(); } }, "Retirer le bloc")),
-          condEditor(s.cond = s.cond || [], touch, rerender, "Afficher ce bloc seulement si :"), tb, ta,
+          condEditor(s.cond = s.cond || [], touch, rerender, "Afficher ce bloc seulement si :", s), tb, ta,
           h("details", { open: (s.effets || []).length ? "open" : null }, h("summary", { class: "hint", text: "Effets de ce bloc" + ((s.effets || []).length ? " · " + s.effets.length : "") }),
             h("div", { class: "sec", style: "margin-top:6px" }, h("span", { class: "hint", text: "Appliqués à la première visite, seulement si la condition du bloc est remplie (ex. : le Réfugié de Lorme apprend une information)." }),
               fxEditor(s.effets = s.effets || [], touch, rerender)))));
@@ -702,9 +702,10 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ["info", "Connaît l'information"], ["sansinfo", "Ne connaît pas l'information"],
     ["stat", "Caractéristique"], ["usure", "Usure"], ["compteur", "Compteur de l'Ordre"], ["fragment", "A trouvé le fragment"], ["visite", "A déjà visité le passage"], ["pasvisite", "N'a jamais visité le passage"]
   ];
-  function condEditor(list, touch, rerender, title) {
+  function condEditor(list, touch, rerender, title, owner) {
     var box = h("div", { class: "sec" });
-    if (title) box.appendChild(h("span", { class: "hint", text: title + (list.length > 1 ? " (toutes les conditions)" : "") }));
+    if (title) box.appendChild(h("span", { class: "hint", text: title }));
+    if (owner && list.length > 1) box.appendChild(h("label", { class: "f inline" }, selectEl([["", "toutes ces conditions"], ["ou", "au moins une de ces conditions"]], owner.ou ? "ou" : "", function (v) { if (v) owner.ou = true; else delete owner.ou; touch(); })));
     var rows = h("div", { class: "mini-rows" });
     list.forEach(function (c, i) {
       var row = h("div", { class: "mini-row" });
@@ -804,7 +805,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         var more = h("details", { open: c.cond.length || c.effets.length ? "open" : null });
         more.appendChild(h("summary", { class: "hint", text: "Condition et effets" + (c.cond.length ? " · " + c.cond.length + " condition(s)" : "") + (c.effets.length ? " · " + c.effets.length + " effet(s)" : "") }));
         var inner = h("div", { class: "sec", style: "margin-top:8px" });
-        inner.appendChild(condEditor(c.cond, touch, rerender, "Ce choix n'est possible que si :"));
+        inner.appendChild(condEditor(c.cond, touch, rerender, "Ce choix n'est possible que si :", c));
         if (c.cond.length) {
           inner.appendChild(h("div", { class: "mini-row" },
             h("span", { class: "hint", text: "Sinon :" }),
@@ -898,6 +899,32 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     return base + plus + bonus("cp");
   }
   function poidsTotal() { var t = 0; Object.keys(P.inv).forEach(function (id) { var o = D.objets[id]; if (o) t += (+o.poids || 0) * P.inv[id]; }); return t; }
+
+  /* Équipement automatique : jamais une arme ou une armure plus faible */
+  function moyenneDes(txt) { var d = parseDice(txt); return d[0] * (d[1] + 1) / 2 + d[2]; }
+  function equipAuto(id, o) {
+    var sl = slotOf(o); if (!sl) return "";
+    var cur = P.eq[sl] && P.inv[P.eq[sl]] ? D.objets[P.eq[sl]] : null;
+    if (sl === "arme") {
+      var base = cur ? cur.arme_degats : (occOf(P.setup.occupation) || {}).degats;
+      if (moyenneDes(o.arme_degats || "1d6") >= moyenneDes(base || "1d6")) { P.eq.arme = id; return " · en main"; }
+      return " · dans ton sac (ton arme actuelle frappe plus fort)";
+    }
+    if (sl === "armure") {
+      if (!cur || (+o.bonus_armure || 0) + (+o.bonus_parade || 0) > (+cur.bonus_armure || 0) + (+cur.bonus_parade || 0)) { P.eq.armure = id; return " · porté"; }
+      return " · dans ton sac (à équiper depuis ta fiche)";
+    }
+    if (!cur) { P.eq[sl] = id; return " · porté"; }
+    return " · dans ton sac (à équiper depuis ta fiche)";
+  }
+  function secoursLumiere() {
+    if (!P.lumOn || (P.s.lum || 0) > 0) return null;
+    var id = Object.keys(P.inv).filter(function (k) { var o = D.objets[k]; return o && o.effet_stat === "lum" && P.inv[k] > 0; })
+      .sort(function (a, b) { return (+D.objets[b].effet_val || 0) - (+D.objets[a].effet_val || 0); })[0];
+    if (!id) return null;
+    var nom = D.objets[id].nom; utiliser(id);
+    return "Ta lanterne allait s'éteindre : tu y glisses in extremis " + nom + " (Lumière " + P.s.lum + ")";
+  }
   function utilisable(o) { return !!(o && (o.effet_stat || o.temp_stat)); }
 
   function eff(k) {
@@ -956,14 +983,13 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     }
     return true;
   }
-  function allOk(list) { return (list || []).every(condOk); }
+  function allOk(list, ou) { list = list || []; return ou && list.length ? list.some(condOk) : list.every(condOk); }
   function applyFx(list) {
     var out = [];
     (list || []).forEach(function (f) {
       var n = f.n == null ? 1 : +f.n, nm;
       if (f.type === "donner" && f.val) {
-        P.inv[f.val] = (P.inv[f.val] || 0) + (n || 1); nm = D.objets[f.val]; out.push("+ " + (nm ? nm.nom : "objet") + (n > 1 ? " ×" + n : ""));
-        var sl = slotOf(nm); if (sl && !P.eq[sl]) { P.eq[sl] = f.val; out.push(nm.nom + " équipé"); }
+        P.inv[f.val] = (P.inv[f.val] || 0) + (n || 1); nm = D.objets[f.val]; out.push("+ " + (nm ? nm.nom : "objet") + (n > 1 ? " ×" + n : "") + (nm ? equipAuto(f.val, nm) : ""));
       }
       else if (f.type === "retirer" && f.val) {
         P.inv[f.val] = Math.max(0, (P.inv[f.val] || 0) - (n || 1)); if (!P.inv[f.val]) { delete P.inv[f.val]; Object.keys(P.eq).forEach(function (k) { if (P.eq[k] === f.val) delete P.eq[k]; }); }
@@ -1003,9 +1029,10 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     if (!p) return;
     if (!P.vus[pid]) {
       P.fx = applyFx(p.effets);
-      (p.segments || []).forEach(function (sg, i) { if (i > 0 && (sg.effets || []).length && allOk(sg.cond)) P.fx = P.fx.concat(applyFx(sg.effets)); });
+      (p.segments || []).forEach(function (sg, i) { if (i > 0 && (sg.effets || []).length && allOk(sg.cond, sg.ou)) P.fx = P.fx.concat(applyFx(sg.effets)); });
     }
     if (finTemp.length) P.fx = (P.fx || []).concat(finTemp);
+    var secours = secoursLumiere(); if (secours) P.fx = (P.fx || []).concat(secours);
     P.vus[pid] = true;
     if (p.debutActe) { var snap = JSON.parse(JSON.stringify(P)); snap.save = null; snap.combat = null; snap.test = null; P.save = snap; P.fx = P.fx.concat(["Sauvegarde : début de l'acte"]); }
     if (p.issue && p.issue.type === "combat") P.combat = newCombat(p.issue.ennemi);
@@ -1088,7 +1115,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     if ((P.temp || []).length) page.appendChild(h("div", { class: "pv-fx", text: "En cours : " + P.temp.map(function (t) { return tempTxt(t); }).join(" · ") }));
     var text = h("div", { class: "pv-text" });
     (p.segments || []).forEach(function (sg, i) {
-      if (i > 0 && !allOk(sg.cond)) return;
+      if (i > 0 && !allOk(sg.cond, sg.ou)) return;
       var d = h("div", { class: i > 0 ? "condseg" : null, html: richText(genre(sg.texte, P.setup.genre)) });
       text.appendChild(d);
     });
@@ -1106,7 +1133,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     if (is.type === "choix") {
       var shown = 0;
       (is.choix || []).forEach(function (c) {
-        var ok = allOk(c.cond);
+        var ok = allOk(c.cond, c.ou);
         if (!ok && (c.affichage || "cache") === "cache") return;
         shown++;
         page.appendChild(h("button", { class: "pv-choice", disabled: !ok || !c.cible ? "disabled" : null, onclick: function () { go(c.cible, c.effets); } }, genre(c.texte || "(choix sans texte)", P.setup.genre)));
@@ -1198,7 +1225,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       btn("parer", "Parer", "Force · " + (t.parer === null ? "impossible" : t.parer));
       btn("prudente", "Garde prudente", "moitié des dégâts");
       btn("observer", "Observer", c.observed ? "déjà tenté" : !e.voile ? "inutile ici" : "Sagesse · " + eff("sag"), c.observed || !e.voile);
-      P.mots.forEach(function (mid) { var m = D.mots[mid]; if (!m || m.effet === "recit") return; btn("mot:" + mid, m.nom, (m.cout || 0) + " Mana"); });
+      P.mots.forEach(function (mid) { var m = D.mots[mid]; if (!m || !m.effet || m.effet === "recit") return; btn("mot:" + mid, m.nom, (m.cout || 0) + " Mana"); });
       box.appendChild(acts);
     }
     var log = h("ol", { class: "cb-log", "aria-live": "polite" });
@@ -1478,17 +1505,30 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         if (!is.ennemi || !D.ennemis[is.ennemi]) add("erreur", p, "Combat sans ennemi.");
         if (!is.victoire || !D.passages[is.victoire]) add("erreur", p, "Le combat n'a pas de passage pour la victoire.");
       } else if (is.type !== "fin") add("erreur", p, "Pas d'issue.");
-      function scanCond(list, where) {
+      function scanCond(list, where, eff) {
         (list || []).forEach(function (c) {
           if (c.type === "objet" && c.val && !given.objets[c.val]) add("erreur", p, where + " demande « " + (D.objets[c.val] ? D.objets[c.val].nom : "?") + " », que rien ne donne.");
           if (c.type === "mot" && c.val && !given.mots[c.val]) add("erreur", p, where + " demande le « " + (D.mots[c.val] ? D.mots[c.val].nom : "?") + " », que rien n'apprend.");
           if (c.type === "info" && c.val && !given.infos[c.val]) add("erreur", p, where + " demande l'information « " + (D.infos[c.val] ? D.infos[c.val].nom : "?") + " », que rien ne donne.");
-          if (["objet", "sansobjet", "mot", "info", "sansinfo", "fragment", "origine", "occupation", "visite", "pasvisite"].indexOf(c.type) >= 0 && !c.val) add("attention", p, where + " a une condition incomplète.");
+          if (["objet", "sansobjet", "mot", "info", "sansinfo", "fragment", "origine", "occupation", "visite", "pasvisite"].indexOf(c.type) >= 0 && !c.val) add("erreur", p, where + " a une condition incomplète (« " + condLbl(c.type) + " » sans valeur choisie) : elle ne fera pas ce que tu attends.");
+          if (c.type === "stat" && !c.stat) add("erreur", p, where + " a une condition « Caractéristique » sans caractéristique choisie : c'est la Force qui sera testée.");
+          if (c.type === "pasvisite" && c.val === p.id) add("erreur", p, where + " demande « N'a jamais visité » ce même passage : c'est toujours faux à l'affichage, car le passage compte déjà comme visité. Retire cette condition : les effets d'un passage ne s'appliquent de toute façon qu'une fois.");
+          if (c.type === "visite" && c.val === p.id) add("attention", p, where + " demande « A déjà visité » ce même passage : c'est toujours vrai.");
+          if (eff && c.type === "sansobjet" && eff.some(function (f) { return f.type === "donner" && f.val === c.val; })) add("erreur", p, where + " demande de ne pas posséder « " + (D.objets[c.val] || {}).nom + " » et donne cet objet : son texte ne s'affichera jamais.");
         });
       }
-      (p.segments || []).forEach(function (s, i) { if (i > 0) scanCond(s.cond, "Un bloc conditionnel"); });
+      (p.segments || []).forEach(function (s, i) { if (i > 0) scanCond(s.cond, "Le bloc conditionnel " + i, s.effets); });
       ((p.issue || {}).choix || []).forEach(function (c, i) { scanCond(c.cond, "Le choix " + (i + 1)); });
     });
+    Object.keys(D.objets).forEach(function (k) {
+      var o = D.objets[k];
+      if (!given.objets[k]) add("attention", null, "Objet « " + (o.nom || "sans nom") + " » : rien ne le donne dans le livre.");
+      if ((o.effet_stat || o.temp_stat) && !o.consommable && (+o.effet_val || o.temp_stat)) add("attention", null, "Objet « " + (o.nom || "sans nom") + " » : son effet à l'utilisation n'est pas consommable, le joueur peut l'utiliser à volonté (même en combat, à chaque tour).");
+      if (o.effet_stat && !(+o.effet_val)) add("attention", null, "Objet « " + (o.nom || "sans nom") + " » : effet immédiat réglé sur " + (STATS[o.effet_stat] || o.effet_stat) + " mais à 0. Remets « aucun » si l'objet ne s'utilise pas.");
+    });
+    Object.keys(D.fragments || {}).forEach(function (k) { if (!given.fragments[k]) add("attention", null, "Fragment « " + (D.fragments[k].nom || "sans titre") + " » : rien ne le fait trouver dans le livre."); });
+    Object.keys(D.mots).forEach(function (k) { var m = D.mots[k]; if (!m.effet) add("attention", null, "Mot « " + (m.nom || "sans nom") + " » : aucun effet de combat choisi. Il n'apparaîtra pas en combat (comme « récit »)."); });
+    Object.keys(D.ennemis).forEach(function (k) { var e = D.ennemis[k]; if (!String(e.nom || "").trim()) add("attention", null, "Un ennemi du catalogue n'a pas de nom."); });
     var dep = R().depart;
     var acts = {}; ps.forEach(function (p) { if (p.debutActe) acts[String(p.acte || "0")] = 1; });
     ["1", "2", "3"].forEach(function (a) { if (ps.some(function (p) { return String(p.acte) === a; }) && !acts[a]) add("attention", null, "L'acte " + ["", "I", "II", "III"][+a] + " n'a pas de passage « début d'acte » : pas de sauvegarde pour cet acte."); });
@@ -1851,19 +1891,20 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       }, function (e) { say(e && e.code === "declined" ? "Téléchargement annulé." : "Le téléchargement a échoué.", true); });
     }).catch(function () { say("Impossible de préparer le jeu. Recharge l'atelier et réessaie.", true); });
   }
-  function condTxt(list) {
+  function condLbl(t) { return (COND_TYPES.filter(function (x) { return x[0] === t; })[0] || [0, t])[1]; }
+  function condTxt(list, ou) {
     return (list || []).map(function (c) {
       var lbl = (COND_TYPES.filter(function (t) { return t[0] === c.type; })[0] || [0, c.type])[1];
       var v = c.type === "objet" || c.type === "sansobjet" ? (D.objets[c.val] || {}).nom : c.type === "mot" ? (D.mots[c.val] || {}).nom : c.type === "info" || c.type === "sansinfo" ? (D.infos[c.val] || {}).nom : c.type === "visite" || c.type === "pasvisite" ? (D.passages[c.val] || {}).num : c.type === "stat" ? STATS[c.stat || "for"] + " " + (c.op || ">=") + " " + c.n : c.type === "usure" || c.type === "compteur" ? (c.op || ">=") + " " + c.n : c.type === "genre" ? (c.val === "f" ? "féminin" : c.val === "n" ? "neutre" : "masculin") : c.val;
       return lbl + " " + (v == null ? "?" : v);
-    }).join(" et ");
+    }).join(ou ? " ou " : " et ");
   }
   function exportBook(g, msg) {
     var out = ["# " + (R().titre || "Livre"), "", "Version " + (g === "f" ? "féminine" : g === "n" ? "neutre" : "masculine") + ", exportée le " + new Date().toLocaleDateString("fr-FR") + ".", ""];
     sortedPassages().forEach(function (p) {
       out.push("## " + (p.num || "?") + (p.titre ? " · " + p.titre : ""), "");
       (p.segments || []).forEach(function (sg, i) {
-        if (i > 0) out.push("> **[Si " + condTxt(sg.cond) + "]**", ">", "> " + genre(sg.texte, g, "[Nom]").replace(/\n/g, "\n> "), "");
+        if (i > 0) out.push("> **[Si " + condTxt(sg.cond, sg.ou) + "]**", ">", "> " + genre(sg.texte, g, "[Nom]").replace(/\n/g, "\n> "), "");
         else out.push(genre(sg.texte, g, "[Nom]"), "");
       });
       var is = p.issue || {};
