@@ -1844,6 +1844,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var prod = h("section", { class: "box", id: "publier" }, h("div", { class: "box-h" }, h("h2", { text: "Publier le jeu" }),
       h("span", { class: "hint", text: "Le fichier à envoyer à tes testeurs" })));
     b = h("div", { class: "box-b" });
+    b.appendChild(h("label", { class: "f", style: "max-width:360px" }, "Apparence du jeu", selectEl([["", "Crypte 4 tons (gothique pixel)"], ["classique", "Classique (livre sombre)"]], r.theme || "", function (v) { if (v) r.theme = v; else delete r.theme; touch(); })));
     b.appendChild(h("div", { class: "mini-row" }, h("span", { class: "hint", text: "Actes inclus :" }),
       [["1", "Acte I"], ["2", "Acte II"], ["3", "Acte III"], ["0", "Sans acte"]].map(function (a) {
         return h("label", { class: "f inline" }, h("input", { type: "checkbox", checked: !!r.exportActes[a[0]], onchange: function (e) { r.exportActes[a[0]] = e.target.checked; touch(); } }), a[1]);
