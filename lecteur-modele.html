@@ -685,7 +685,7 @@ button { cursor: pointer; }
       var o = occOf(st.occupation);
       m.appendChild(h("article", { class: "detail" }, h("h3", { class: "titre-f", text: genre(o.nom || "") }),
         o.desc ? h("p", { text: genre(o.desc) }) : null,
-        h("div", { class: "infos", html: "<span>Favorise <b>" + esc((o.fav || []).map(function (k) { return k === "cp" ? "la Capacité de port" : (k === "for" || k === "vig" ? "la " : "l'") + STATS[k]; }).join("</b> et <b>")) + "</b></span><span>Arme : <b>" + esc((o.arme || "").toLowerCase()) + "</b>, " + esc(o.degats || "") + "</span>" + (o.armure ? "<span>Armure " + o.armure + "</span>" : "") + (o.parade ? "<span>Parade +" + o.parade + "</span>" : "") })));
+        h("div", { class: "infos", html: "<span>Favorise <b>" + (o.fav || []).map(function (k) { return esc(k === "cp" ? "la Capacité de port" : (k === "for" || k === "vig" ? "la " : "l'") + STATS[k]); }).join("</b> et <b>") + "</b></span><span>Arme : <b>" + esc((o.arme || "").toLowerCase()) + "</b>, " + esc(o.degats || "") + "</span>" + (o.armure ? "<span>Armure " + o.armure + "</span>" : "") + (o.parade ? "<span>Parade +" + o.parade + "</span>" : "") })));
     } else if (UI.etape === 3) {
       if (!st.rolled) st.rolled = { for: roll([3, 6, 1]), hab: roll([3, 6, 1]), sag: roll([3, 6, 1]) };
       var tmp = nouveauPerso(st), fav = occOf(st.occupation).fav || [];
