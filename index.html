@@ -974,6 +974,9 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     return "";
   }
   function talentDe(o) { o = o || {}; return o.talent === "aucun" ? "" : (o.talent || devineTalent(o.nom)); }
+  function bonusOrigine(o) { o = o || {}; return o.bonus === "aucun" ? "" : (o.bonus || (/(^|[^a-zà-ÿ])est nostra/i.test(o.nom || "") ? "debrouillard" : "")); }
+  function debrouillard() { return !!P && bonusOrigine(origOfA(P.setup.origine)) === "debrouillard"; }
+  function origOfA(name) { return R().origines.filter(function (o) { return o.nom === name; })[0] || null; }
   function occOf(name) { return R().occupations.filter(function (o) { return o.nom === name; })[0] || null; }
   function newPlayer(setup) {
     var R_ = R(), o = occOf(setup.occupation) || { fav: [] };
@@ -1040,12 +1043,12 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else if (f.type === "fragment" && f.val) { P.frag = P.frag || []; if (P.frag.indexOf(f.val) < 0) { P.frag.push(f.val); nm = D.fragments[f.val]; out.push("Fragment de lore : " + (nm ? nm.nom : "?")); } }
       else if (f.type === "oubli" && f.val) { P.infos = P.infos.filter(function (x) { return x !== f.val; }); }
       else if (f.type === "stat") {
-        var k = f.stat || "vig";
+        var k = f.stat || "vig", deb = false;
         if (k === "vig") P.s.vig = Math.max(0, Math.min(eff("vigMax"), P.s.vig + n));
         else if (k === "man") P.s.man = Math.max(0, Math.min(eff("manMax"), P.s.man + n));
-        else if (k === "lum") P.s.lum = Math.max(0, Math.min(LUMMAX(), (P.s.lum || 0) + n));
+        else if (k === "lum") { if (n > 0 && debrouillard()) { n += 1; deb = true; } P.s.lum = Math.max(0, Math.min(LUMMAX(), (P.s.lum || 0) + n)); }
         else P.s[k] = Math.max(0, P.s[k] + n);
-        out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
+        out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k] + (deb ? " (débrouillard)" : ""));
       }
       else if (f.type === "lumiere_on") {
         if (f.n == null && P.lumDeja) { if (!P.lumOn) out.push("Lanterne rallumée : Lumière " + (P.s.lum || 0) + " / " + LUMMAX()); P.lumOn = true; }
@@ -1753,13 +1756,14 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       ["for", "hab", "sag"].map(function (k) { return h("label", { class: "f inline" }, STATS[k], h("input", { type: "number", value: r.base[k], oninput: function (e) { r.base[k] = +e.target.value; touch(); } })); })));
 
     b.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Origines" })));
-    var t1 = h("table", { class: "mini" }, h("thead", null, h("tr", null, h("th", { text: "Nom" }), h("th", { text: "Description" }), h("th", { text: "Effet en jeu" }), h("th"))));
+    var t1 = h("table", { class: "mini" }, h("thead", null, h("tr", null, h("th", { text: "Nom" }), h("th", { text: "Description" }), h("th", { text: "Effet en jeu" }), h("th", { text: "Bonus de règle" }), h("th"))));
     var tb1 = h("tbody");
     r.origines.forEach(function (o, i) {
       tb1.appendChild(h("tr", null,
         h("td", null, h("input", { type: "text", value: o.nom || "", oninput: function (e) { o.nom = e.target.value; touch(); } })),
         h("td", null, h("textarea", { value: o.desc || "", oninput: function (e) { o.desc = e.target.value; touch(); } })),
         h("td", null, h("textarea", { value: o.effet || "", oninput: function (e) { o.effet = e.target.value; touch(); } })),
+        h("td", null, selectEl([["", "auto (" + (bonusOrigine({ nom: o.nom }) ? "Débrouillard" : "aucun") + ")"], ["aucun", "aucun"], ["debrouillard", "Débrouillard : +1 à chaque source de lumière"]], o.bonus || "", function (v) { if (v) o.bonus = v; else delete o.bonus; touch(); })),
         h("td", null, h("button", { class: "x btn small danger", onclick: function () { r.origines.splice(i, 1); rerender(); } }, "Retirer"))));
     });
     t1.appendChild(tb1);

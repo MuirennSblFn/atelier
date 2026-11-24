@@ -449,6 +449,8 @@ img, .illus { image-rendering: pixelated; }
   var P = null;
   var UI = { ecran: "titre", etape: 1, setup: null, modal: null };
   function occOf(n) { return (R.occupations || []).filter(function (o) { return o.nom === n; })[0] || { fav: [] }; }
+  function bonusOrigine(o) { o = o || {}; return o.bonus === "aucun" ? "" : (o.bonus || (/(^|[^a-zà-ÿ])est nostra/i.test(o.nom || "") ? "debrouillard" : "")); }
+  function debrouillard() { return !!P && bonusOrigine(origOf(P.setup.origine)) === "debrouillard"; }
   function origOf(n) { return (R.origines || []).filter(function (o) { return o.nom === n; })[0] || {}; }
   function nouveauPerso(setup) {
     var o = occOf(setup.occupation), fav = o.fav || [], r = setup.rolled;
@@ -633,12 +635,12 @@ img, .illus { image-rendering: pixelated; }
       }
       else if (f.type === "oubli" && f.val) P.infos = P.infos.filter(function (x) { return x !== f.val; });
       else if (f.type === "stat") {
-        var k = f.stat || "vig";
+        var k = f.stat || "vig", deb = false;
         if (k === "vig") P.s.vig = Math.max(0, Math.min(eff("vigMax"), P.s.vig + n));
         else if (k === "man") P.s.man = Math.max(0, Math.min(eff("manMax"), P.s.man + n));
-        else if (k === "lum") P.s.lum = Math.max(0, Math.min(LUMMAX(), (P.s.lum || 0) + n));
+        else if (k === "lum") { if (n > 0 && debrouillard()) { n += 1; deb = true; } P.s.lum = Math.max(0, Math.min(LUMMAX(), (P.s.lum || 0) + n)); }
         else P.s[k] = Math.max(0, P.s[k] + n);
-        out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k]);
+        out.push((n >= 0 ? "+" : "−") + Math.abs(n) + " " + STATS[k] + (deb ? " (débrouillard)" : ""));
       }
       else if (f.type === "lumiere_on") {
         if (f.n == null && P.lumDeja) { if (!P.lumOn) out.push("Lanterne rallumée : Lumière " + (P.s.lum || 0) + " / " + LUMMAX()); P.lumOn = true; }
