@@ -935,6 +935,45 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     return Math.max(0, (P.s[k] || 0) + bonus(k));
   }
   function slotOf(o) { return o && (o.categorie === "arme" || o.categorie === "armure" || o.categorie === "talisman") ? o.categorie : null; }
+
+  /* ---------- Talents d'occupation et familles d'arme ---------- */
+  var TALENTS = {
+    traitre: { nom: "Coup en traître", txt: "Ta contre-attaque après une esquive réussie fait ×3 au lieu de ×2." },
+    pisteur: { nom: "Instinct du pisteur", txt: "Tu lis toujours les gestes d'un ennemi, même quand il les cache." },
+    mur: { nom: "Mur de bouclier", txt: "Parer un coup lourd ne te coûte que le quart des dégâts ; parer des coups rapides donne +2 à ton prochain coup." },
+    savoir: { nom: "Savoir ancien", txt: "Ton premier Mot de chaque combat coûte 2 Mana de moins." },
+    rage: { nom: "Rage", txt: "Sous la moitié de ta Vigueur : +2 dégâts à chaque coup, mais plus de garde prudente." },
+    main: { nom: "La main de l'Inconnu", txt: "Une fois par combat, un dé raté est relancé." }
+  };
+  var FAMILLES = {
+    dague: { nom: "dague", txt: "Légère : +2 pour Esquiver." },
+    epee: { nom: "épée", txt: "Équilibrée : +1 pour Frapper et pour Parer." },
+    hache: { nom: "hache ou masse", txt: "Brise-garde : contre une garde basse, dégâts ×2." },
+    lance: { nom: "lance", txt: "Allonge : contre des coups rapides, si tu touches, tu ne prends que la moitié des dégâts." },
+    arc: { nom: "arc ou arbalète", txt: "À distance : un tir gratuit en ouvrant le combat, +3 pour interrompre une incantation, mais −2 pour Parer." },
+    baton: { nom: "bâton", txt: "Canalisateur : +1 Mana à chaque coup qui touche." }
+  };
+  function devineFamille(nom) {
+    var n = String(nom || "").toLowerCase();
+    if (/arbal|(^|[^a-zà-ÿ])arcs?([^a-zà-ÿ]|$)/.test(n)) return "arc";
+    if (/dague|poignard|couteau|surin/.test(n)) return "dague";
+    if (/lance|pique|hallebarde|épieu/.test(n)) return "lance";
+    if (/hache|masse|marteau|fléau|gourdin/.test(n)) return "hache";
+    if (/bâton|baton/.test(n)) return "baton";
+    if (/épée|epée|epee|sabre|lame|rapière/.test(n)) return "epee";
+    return "";
+  }
+  function devineTalent(nom) {
+    var n = String(nom || "").toLowerCase();
+    if (/malandrin|couleuvre/.test(n)) return "traitre";
+    if (/rôdeur|rodeur|cormoran/.test(n)) return "pisteur";
+    if (/chevalier|héron/.test(n)) return "mur";
+    if (/rainette/.test(n)) return "savoir";
+    if (/sanglier/.test(n)) return "rage";
+    if (/élu|inconnu/.test(n)) return "main";
+    return "";
+  }
+  function talentDe(o) { o = o || {}; return o.talent === "aucun" ? "" : (o.talent || devineTalent(o.nom)); }
   function occOf(name) { return R().occupations.filter(function (o) { return o.nom === name; })[0] || null; }
   function newPlayer(setup) {
     var R_ = R(), o = occOf(setup.occupation) || { fav: [] };
@@ -1587,7 +1626,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       ["effet_stat", "Effet immédiat à l'utilisation", "statsel"], ["effet_val", "Valeur de l'effet immédiat", "number"],
       ["temp_stat", "Effet temporaire : caractéristique", "tempsel"], ["temp_val", "Effet temporaire : valeur (négative = malus)", "number"],
       ["temp_duree", "Effet temporaire : durée", "dureesel"], ["temp_n", "Effet temporaire : nombre de tours ou de passages", "number"],
-      ["arme_degats", "Arme : dégâts (ex. : 1d6+2)", "text"], ["arme_attaque", "Arme : caractéristique d'attaque", "atksel"],
+      ["famille", "Famille d'arme (pour une arme)", "famsel"], ["arme_degats", "Arme : dégâts (ex. : 1d6+2)", "text"], ["arme_attaque", "Arme : caractéristique d'attaque", "atksel"],
       ["bonus_armure", "Équipé : bonus d'armure", "number"], ["bonus_parade", "Équipé : bonus de parade", "number"],
       ["bonus_stat", "Équipé : caractéristique améliorée", "bonussel"], ["bonus_val", "Équipé : valeur du bonus", "number"],
       ["notes", "Notes", "area"]
@@ -1647,6 +1686,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else if (f[2] === "bool") el = h("input", { type: "checkbox", checked: !!cur[k], onchange: function (e) { cur[k] = e.target.checked; touch(); } });
       else if (f[2] === "statsel") el = selectEl([["", "aucun"]].concat(Object.keys(STATS).map(function (s) { return [s, STATS[s]]; })), cur[k] || "", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "catsel") el = selectEl([["divers", "Divers"], ["arme", "Arme (s'équipe)"], ["armure", "Armure (s'équipe)"], ["talisman", "Talisman (s'équipe)"]], cur[k] || "divers", function (v) { cur[k] = v; touch(); render(); });
+      else if (f[2] === "famsel") el = selectEl([["", "auto (" + ((FAMILLES[devineFamille(cur.nom)] || {}).nom || "aucune") + ")"]].concat(Object.keys(FAMILLES).map(function (x) { return [x, FAMILLES[x].nom]; })), cur[k] || "", function (v) { if (v) cur[k] = v; else delete cur[k]; touch(); });
       else if (f[2] === "tempsel") el = selectEl([["", "aucun"]].concat(Object.keys(TEMP_LBL).map(function (x) { return [x, TEMP_LBL[x]]; })), cur[k] || "", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "dureesel") el = selectEl([["combat", "Jusqu'à la fin du combat (le prochain, s'il est bu avant)"], ["tours", "Un nombre de tours de combat"], ["passages", "Un nombre de passages"]], cur[k] || "combat", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "atksel") el = selectEl([["for", "Force"], ["hab", "Habileté"]], cur[k] || "for", function (v) { cur[k] = v; touch(); });
@@ -1727,7 +1767,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     b.appendChild(h("div", null, h("button", { class: "btn small", onclick: function () { r.origines.push({ nom: "", desc: "" }); rerender(); } }, "+ origine")));
 
     b.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Occupations" })));
-    var t2 = h("table", { class: "mini" }, h("thead", null, h("tr", null, ["Nom", "Favorisées (+2)", "Arme", "Dégâts", "Attaque", "Armure", "Parade", ""].map(function (x) { return h("th", { text: x }); }))));
+    var t2 = h("table", { class: "mini" }, h("thead", null, h("tr", null, ["Nom", "Favorisées (+2)", "Arme", "Famille", "Dégâts", "Attaque", "Armure", "Parade", "Talent", ""].map(function (x) { return h("th", { text: x }); }))));
     var tb2 = h("tbody");
     r.occupations.forEach(function (o, i) {
       o.fav = o.fav || [];
@@ -1740,10 +1780,12 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         h("td", null, h("input", { type: "text", value: o.nom || "", oninput: function (e) { o.nom = e.target.value; touch(); } })),
         h("td", null, favBox),
         h("td", null, h("input", { type: "text", value: o.arme || "", oninput: function (e) { o.arme = e.target.value; touch(); } })),
+        h("td", null, selectEl([["", "auto (" + ((FAMILLES[devineFamille(o.arme)] || {}).nom || "aucune") + ")"]].concat(Object.keys(FAMILLES).map(function (k) { return [k, FAMILLES[k].nom]; })), o.famille || "", function (v) { if (v) o.famille = v; else delete o.famille; touch(); })),
         h("td", null, h("input", { type: "text", value: o.degats || "", style: "width:5em", oninput: function (e) { o.degats = e.target.value; touch(); } })),
         h("td", null, selectEl([["for", "Force"], ["hab", "Habileté"]], o.attaque || "for", function (v) { o.attaque = v; touch(); })),
         h("td", null, h("input", { type: "number", value: o.armure || 0, oninput: function (e) { o.armure = +e.target.value; touch(); } })),
         h("td", null, h("input", { type: "number", value: o.parade || 0, oninput: function (e) { o.parade = +e.target.value; touch(); } })),
+        h("td", null, selectEl([["", "auto (" + ((TALENTS[devineTalent(o.nom)] || {}).nom || "aucun") + ")"], ["aucun", "aucun"]].concat(Object.keys(TALENTS).map(function (k) { return [k, TALENTS[k].nom]; })), o.talent || "", function (v) { if (v) o.talent = v; else delete o.talent; touch(); })),
         h("td", null, h("button", { class: "btn small danger", onclick: function () { r.occupations.splice(i, 1); rerender(); } }, "Retirer"))));
     });
     t2.appendChild(tb2);
@@ -1999,6 +2041,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>Les fragments de lore :</b> des textes à collectionner (une page de journal, une lettre, une légende) que le joueur range dans son Carnet et relit quand il veut, même depuis la page de titre. Écris-les dans l'onglet Fragments ; donne-les avec l'effet « Trouver le fragment de lore » (à l'entrée d'un passage, sur un choix, ou en butin). Les fragments d'une même collection sont regroupés et triés par leur ordre ; ceux pas encore trouvés apparaissent comme « ? ? ? ». Un fragment trouvé le reste, même après une mort ou une nouvelle partie.</p>",
       "<p><b>La lumière :</b> l'effet « Allumer la lanterne » fait apparaître la jauge (10 points par défaut, réglable dans Réglages). Elle perd 1 point à chaque passage où le joueur entre ensuite (un retour en arrière compte aussi). À 0, le joueur meurt dans le noir, sauf si le passage est une fin. Pour la recharger : effet « Caractéristique » → Lumière +6 (bougie), +3 (bout de chandelle), +1 (allumette), à l'entrée du passage où on la trouve ; ou un objet à effet immédiat Lumière si tu veux que le joueur la garde pour plus tard. Une recharge trouvée dans le passage où la jauge tombe à 0 sauve le joueur. « Éteindre la lanterne » arrête la jauge sans la vider, et « Allumer la lanterne » la fait repartir là où elle en était (seule la toute première fois la remplit). Exemple : « Allumer » sur le choix qui descend dans la crypte, « Éteindre » sur le choix qui remonte. La condition « Caractéristique » → Lumière permet aussi des choix du type « si ta lanterne brûle encore assez ».</p>",
       "<p><b>La Capacité de port :</b> chaque héros porte (Force + 3) points de poids, +2 si son occupation favorise le Port. Le poids d'un objet compte tant qu'il est dans le sac, multiplié par le nombre d'exemplaires. Une sacoche ou une besace augmente la capacité grâce au champ « Capacité de port en plus » : elle compte tant que le joueur la possède, sans l'équiper. Si le sac déborde, le jeu bloque la suite jusqu'à ce que le joueur choisisse ce qu'il laisse sur place.</p>",
+      "<p><b>Talents et familles d'arme :</b> chaque occupation a un talent de combat (Coup en traître, Instinct du pisteur, Mur de bouclier, Savoir ancien, Rage, La main de l'Inconnu) et chaque arme une famille (dague, épée, hache ou masse, lance, arc ou arbalète, bâton) qui modifie le combat. Réglages → Occupations, et champ « Famille d'arme » des objets. « auto » devine d'après le nom. Ces règles jouent dans le jeu publié ; l'aperçu de l'Atelier ne les applique pas.</p>",
       "<p><b>Le butin :</b> dans un passage qui se termine par un combat, la carte « Butin » liste ce que le joueur récupère s'il gagne (objets, or, Mots, informations). Il le découvre dans la fenêtre de combat, avant « Continuer ».</p>",
       "<p><b>L'équipement :</b> un objet de catégorie Arme, Armure ou Talisman s'équipe. Une arme remplace l'arme de l'occupation en combat ; armures et talismans ajoutent leurs bonus. Le premier objet reçu dans chaque emplacement s'équipe tout seul.</p>",
       "<p><b>La sauvegarde par acte :</b> coche « Début d'acte » sur le premier passage de chaque acte. Quand le joueur meurt, il y revient avec l'état qu'il avait en arrivant.</p>",
