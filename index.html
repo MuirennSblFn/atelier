@@ -241,12 +241,12 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
   var STATUTS = { afaire: "À écrire", brouillon: "Brouillon", ecrit: "Écrit", relu: "Relu" };
   var FINS = ["Bonne fin", "Fin douce-amère", "Mauvaise fin", "Fin d'évasion", "Échec", "Mort"];
-  var COLS = ["passages", "objets", "mots", "infos", "fragments", "ennemis"];
+  var COLS = ["passages", "objets", "mots", "infos", "fragments", "ennemis", "pnj"];
 
-  var D = { passages: {}, objets: {}, mots: {}, infos: {}, fragments: {}, ennemis: {}, reglages: null };
+  var D = { passages: {}, objets: {}, mots: {}, infos: {}, fragments: {}, ennemis: {}, pnj: {}, reglages: null };
   var UI = { view: "passages", sel: null, q: "", acte: "tous", catSel: {}, preview: true, confirmDel: false };
   var db = null, assets = null, downloads = null, offline = false, GH = null;
-  var loaded = { passages: false, objets: false, mots: false, infos: false, fragments: false, ennemis: false, reglages: false };
+  var loaded = { passages: false, objets: false, mots: false, infos: false, fragments: false, ennemis: false, pnj: false, reglages: false };
 
   var DEFAULT_REGLAGES = {
     titre: "Aventures en Képultum",
@@ -448,6 +448,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ["graphe", "Graphe", null],
     ["jouer", "Jouer", null],
     ["ennemis", "Ennemis", function () { return Object.keys(D.ennemis).length; }],
+    ["pnj", "PNJ", function () { return Object.keys(D.pnj).length; }],
     ["objets", "Objets", function () { return Object.keys(D.objets).length; }],
     ["mots", "Mots", function () { return Object.keys(D.mots).length; }],
     ["infos", "Informations", function () { return Object.keys(D.infos).length; }],
@@ -700,7 +701,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     ["origine", "Origine est"], ["occupation", "Occupation est"], ["genre", "Genre est"],
     ["objet", "Possède l'objet"], ["sansobjet", "Ne possède pas l'objet"], ["mot", "Connaît le Mot"],
     ["info", "Connaît l'information"], ["sansinfo", "Ne connaît pas l'information"],
-    ["stat", "Caractéristique"], ["usure", "Usure"], ["compteur", "Compteur de l'Ordre"], ["fragment", "A trouvé le fragment"], ["visite", "A déjà visité le passage"], ["pasvisite", "N'a jamais visité le passage"]
+    ["stat", "Caractéristique"], ["usure", "Usure"], ["compteur", "Compteur de l'Ordre"], ["fragment", "A trouvé le fragment"], ["visite", "A déjà visité le passage"], ["pasvisite", "N'a jamais visité le passage"], ["dispo", "Disposition d'un PNJ (0 à 10)"]
   ];
   function condEditor(list, touch, rerender, title, owner) {
     var box = h("div", { class: "sec" });
@@ -734,6 +735,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     else if (c.type === "visite" || c.type === "pasvisite") row.appendChild(selectEl(passageOpts(), c.val || "", set("val")));
     else {
       if (c.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), c.stat || "for", set("stat")));
+      if (c.type === "dispo") row.appendChild(selectEl(catOpts("pnj", "le PNJ de la conversation"), c.val || "", set("val")));
       row.appendChild(selectEl([[">=", "≥"], ["<=", "≤"], ["==", "="]], c.op || ">=", set("op")));
       row.appendChild(h("input", { type: "number", value: c.n == null ? 1 : c.n, oninput: function (e) { c.n = +e.target.value; touch(); } }));
     }
@@ -743,7 +745,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   var FX_TYPES = [
     ["donner", "Donner l'objet"], ["retirer", "Retirer l'objet"], ["mot", "Apprendre le Mot"],
     ["info", "Apprendre l'information"], ["oubli", "Oublier l'information"], ["lumiere_on", "Allumer la lanterne (jauge pleine la 1re fois, puis reprend où elle en était)"], ["lumiere_off", "Éteindre la lanterne (la jauge s'arrête et garde sa valeur)"], ["fragment", "Trouver le fragment de lore"], ["stat", "Modifier une caractéristique"],
-    ["lancer", "Prononcer le Mot (coûte son Mana)"], ["usure", "Ajouter de l'Usure"], ["compteur", "Avancer le compteur de l'Ordre"]
+    ["lancer", "Prononcer le Mot (coûte son Mana)"], ["usure", "Ajouter de l'Usure"], ["compteur", "Avancer le compteur de l'Ordre"], ["dispo", "Changer la disposition d'un PNJ (+ ou −)"]
   ];
   function fxEditor(list, touch, rerender) {
     var box = h("div", { class: "sec" });
@@ -762,6 +764,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else if (f.type === "lumiere_on") row.appendChild(h("label", { class: "f inline" }, "points (vide = plein la 1re fois, puis reprise)", h("input", { type: "number", min: 1, value: f.n == null ? "" : f.n, placeholder: "plein", oninput: function (e) { f.n = e.target.value === "" ? null : +e.target.value; touch(); } })));
       else {
         if (f.type === "stat") row.appendChild(selectEl(Object.keys(STATS).map(function (k) { return [k, STATS[k]]; }), f.stat || "vig", set("stat")));
+        if (f.type === "dispo") row.appendChild(selectEl(catOpts("pnj", "le PNJ de la conversation"), f.val || "", set("val")));
         row.appendChild(h("input", { type: "number", value: f.n == null ? (f.type === "stat" ? -1 : 1) : f.n, oninput: function (e) { f.n = +e.target.value; touch(); } }));
       }
       row.appendChild(h("button", { class: "x", "aria-label": "Retirer l'effet", title: "Retirer l'effet", onclick: function () { list.splice(i, 1); rerender(); } }, "×"));
@@ -779,11 +782,11 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var box = h("div", { class: "sec" });
     box.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Ce passage se termine par" })));
     var seg = h("div", { class: "seg", role: "group", "aria-label": "Type d'issue" });
-    [["choix", "Des choix"], ["test", "Un test"], ["combat", "Un combat"], ["fin", "Une fin"]].forEach(function (o) {
+    [["choix", "Des choix"], ["dialogue", "Un dialogue"], ["test", "Un test"], ["combat", "Un combat"], ["fin", "Une fin"]].forEach(function (o) {
       seg.appendChild(h("button", { "aria-pressed": is.type === o[0] ? "true" : "false", onclick: function () {
         if (is.type === o[0]) return;
         is.type = o[0];
-        if (o[0] === "choix" && !is.choix) is.choix = [];
+        if ((o[0] === "choix" || o[0] === "dialogue") && !is.choix) is.choix = [];
         if (o[0] === "test" && !is.stat) { is.stat = "hab"; is.modif = 0; }
         if (o[0] === "fin" && !is.fin) is.fin = "Mort";
         rerender();
@@ -791,7 +794,17 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     });
     box.appendChild(seg);
 
-    if (is.type === "choix") {
+    if (is.type === "dialogue") {
+      box.appendChild(h("div", { class: "card" },
+        h("div", { class: "row" },
+          h("label", { class: "f" }, "Personnage", selectEl(catOpts("pnj", "— choisir un PNJ —"), is.pnj || "", function (v) { is.pnj = v; touch(); rerender(); })),
+          h("label", { class: "f grow" }, "Texte du bouton (facultatif)", h("input", { type: "text", value: is.bouton || "", placeholder: "Parler à " + ((D.pnj[is.pnj] || {}).nom || "…"), oninput: function (e) { is.bouton = e.target.value; touch(); } }))),
+        is.pnj && D.pnj[is.pnj] ? h("div", null, h("button", { class: "btn small", onclick: function () { UI.catSel.pnj = is.pnj; UI.view = "pnj"; renderTabs(); render(); } }, "Écrire ses répliques →")) : null,
+        targetPicker(is, "apres", touch, rerender, "Après « Prendre congé » →"),
+        h("span", { class: "hint", text: "Laisse vide pour rester sur ce passage : le joueur retrouve alors les choix ci-dessous (et peut reparler au personnage). Une réponse peut aussi mener directement à un passage (un combat, une fuite…)." })));
+      box.appendChild(h("strong", { text: "Choix sous le bouton" }));
+    }
+    if (is.type === "choix" || is.type === "dialogue") {
       is.choix = is.choix || [];
       is.choix.forEach(function (c, i) {
         c.cond = c.cond || []; c.effets = c.effets || [];
@@ -1022,6 +1035,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       case "stat": return cmp(eff(c.stat || "for"));
       case "usure": return cmp(P.usure);
       case "compteur": return cmp(P.compteur);
+      case "dispo": var dp = c.val || (P.dial && P.dial.pid); return dp && D.pnj[dp] ? cmp(DLG.mem(dp).disp) : false;
     }
     return true;
   }
@@ -1035,7 +1049,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       }
       else if (f.type === "retirer" && f.val) {
         P.inv[f.val] = Math.max(0, (P.inv[f.val] || 0) - (n || 1)); if (!P.inv[f.val]) { delete P.inv[f.val]; Object.keys(P.eq).forEach(function (k) { if (P.eq[k] === f.val) delete P.eq[k]; }); }
-        nm = D.objets[f.val]; out.push("− " + (nm ? nm.nom : "objet"));
+        nm = D.objets[f.val]; out.push("− " + (nm ? nm.nom : "objet") + (n > 1 ? " ×" + n : ""));
         P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax"));
       }
       else if (f.type === "mot" && f.val && P.mots.indexOf(f.val) < 0) { P.mots.push(f.val); nm = D.mots[f.val]; out.push("Mot appris : " + (nm ? nm.nom : "?")); }
@@ -1063,6 +1077,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       }
 
       else if (f.type === "compteur") { P.compteur += n; out.push("Compteur de l'Ordre : " + P.compteur); }
+      else if (f.type === "dispo") { var dp = f.val || (P.dial && P.dial.pid); if (dp && D.pnj[dp]) out.push(DLG.changerDispo(dp, n)); }
     });
     return out;
   }
@@ -1070,7 +1085,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var p = D.passages[pid];
     var finTemp = P.cur && P.cur !== pid ? tempTick("passages") : [];
     if (P.lumOn && P.cur && P.cur !== pid) P.s.lum = Math.max(0, (P.s.lum || 0) - 1);
-    P.cur = pid; P.combat = null; P.test = null; P.fx = [];
+    P.cur = pid; P.combat = null; P.test = null; P.dial = null; P.fx = [];
     if (!p) return;
     if (!P.vus[pid]) {
       P.fx = applyFx(p.effets);
@@ -1175,7 +1190,17 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       return box;
     }
     var is = p.issue || {};
-    if (is.type === "choix") {
+    if (is.type === "dialogue") {
+      var qd = D.pnj[is.pnj], md = P.pnj && P.pnj[is.pnj];
+      if (!qd) page.appendChild(h("p", { class: "ko", text: "Aucun personnage choisi pour ce dialogue." }));
+      else if (P.dial) {
+        if (play) box.appendChild(h("div", { class: "cb-overlay" }, h("div", { class: "cb-dialog", role: "dialog", "aria-modal": "true", "aria-label": "Conversation" },
+          h("div", { class: "toolbar", style: "justify-content:flex-end" }, h("button", { class: "btn small", title: "Ce bouton n'existe que dans l'atelier", onclick: function () { UI.view = "passages"; renderTabs(); render(); } }, "Revenir à l'atelier")), dialogueView(true))));
+        else page.appendChild(dialogueView(false));
+      }
+      if (qd && !P.dial) page.appendChild(h("button", { class: "btn primary", onclick: function () { if (DLG.ouvrir(is.pnj)) rePv(); } }, genre(is.bouton || ((md && md.rencontres ? "Reparler à " : "Parler à ") + (qd.nom || "…")), P.setup.genre)));
+    }
+    if (is.type === "choix" || (is.type === "dialogue" && !P.dial)) {
       var shown = 0;
       (is.choix || []).forEach(function (c) {
         var ok = allOk(c.cond, c.ou);
@@ -1185,7 +1210,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         if (!ok && c.raison) page.appendChild(h("div", { class: "pv-reason", text: c.raison }));
         if (ok && !c.cible) page.appendChild(h("div", { class: "pv-reason", text: "Ce choix ne mène encore nulle part." }));
       });
-      if (!shown) page.appendChild(h("p", { class: "ko", text: "Impasse : aucun choix possible ici." }));
+      if (!shown && is.type === "choix") page.appendChild(h("p", { class: "ko", text: "Impasse : aucun choix possible ici." }));
+    } else if (is.type === "dialogue") {
     } else if (is.type === "test") {
       var val = eff(is.stat || "hab") + (+is.modif || 0);
       var tb = h("div", { class: "sec" });
@@ -1211,6 +1237,130 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     } else {
       page.appendChild(h("p", { class: "ko", text: "Ce passage n'a pas encore d'issue." }));
     }
+    return box;
+  }
+
+  /* ---------- Dialogues : noyau commun (atelier et jeu) ---------- */
+  function NoyauDialogue(A) {
+    var NIV = ["Hostile", "Hostile", "Méfiant", "Méfiant", "Réservé", "Neutre", "Cordial", "Cordial", "Amical", "Confiant", "Confiant"];
+    function S() { return A.etat(); }
+    function fiche(id) { return id ? A.pnj(id) || null : null; }
+    function borne(n) { return Math.max(0, Math.min(10, n)); }
+    function mem(id) {
+      var s = S(); s.pnj = s.pnj || {};
+      if (!s.pnj[id]) { var q = fiche(id) || {}, d0 = q.disposition; s.pnj[id] = { disp: d0 === "" || d0 == null ? 5 : borne(+d0 || 0), dits: {}, sujets: {}, vus: {}, rencontres: 0 }; }
+      return s.pnj[id];
+    }
+    function niveau(n) { return NIV[borne(Math.round(+n || 0))]; }
+    function repl(q, rid) { var l = q.repliques || []; for (var i = 0; i < l.length; i++) if (l[i].id === rid) return l[i]; return l[0] || null; }
+    function cur() { var d = S() && S().dial; if (!d) return null; var q = fiche(d.pid); if (!q) return null; return { d: d, q: q, m: mem(d.pid), r: repl(q, d.rid) }; }
+    function arriver(rid, fx) {
+      var c = cur(), r = repl(c.q, rid);
+      c.d.rid = r ? r.id : null;
+      if (r && !c.m.vus[r.id]) { c.m.vus[r.id] = true; fx = fx.concat(A.fx(r.effets)); }
+      c.d.fx = fx;
+    }
+    function ouvrir(pid) {
+      var q = fiche(pid); if (!q) return false;
+      var m = mem(pid);
+      S().dial = { pid: pid, rid: null, toi: null, fx: [], sujet: null, test: null, retour: m.rencontres > 0 && !!String(q.retour || "").trim() };
+      m.rencontres++;
+      arriver(((q.repliques || [])[0] || {}).id, []);
+      return true;
+    }
+    function court(nom) { var w = String(nom || "").replace(/^(la |le |les |l')/i, "").split(/\s+/); return w[0] || String(nom || ""); }
+    function etiquettes(rep) {
+      var t = [];
+      if (!rep.discret) (rep.cond || []).forEach(function (c) {
+        var op = c.op || ">=";
+        if (c.type === "occupation" && c.val) t.push(court(c.val));
+        else if (c.type === "origine" && c.val) t.push(c.val);
+        else if (c.type === "stat" && op === ">=") t.push((A.STATS[c.stat || "for"] || "") + " " + (+c.n || 0));
+        else if (c.type === "mot" && c.val) t.push(A.nom("mots", c.val));
+        else if (c.type === "objet" && c.val) t.push(A.nom("objets", c.val) + ((+c.n || 1) > 1 ? " ×" + c.n : ""));
+        else if (c.type === "dispo" && op === ">=") t.push(niveau(+c.n || 0));
+      });
+      if (rep.test && rep.test.stat) t.push(A.STATS[rep.test.stat] + " : " + (A.eff(rep.test.stat) + (+rep.test.modif || 0)) + " ou moins au d20");
+      return t;
+    }
+    function reponses() {
+      var c = cur(); if (!c || !c.r) return [];
+      var out = [];
+      (c.r.reponses || []).forEach(function (rep, i) {
+        var key = c.r.id + ":" + (rep.id || i);
+        if (rep.unique && c.m.dits[key]) return;
+        var ok = A.cond(rep.cond, rep.ou);
+        if (!ok && (rep.affichage || "cache") === "cache") return;
+        out.push({ rep: rep, key: key, ok: ok, tags: etiquettes(rep), deja: !!c.m.dits[key] });
+      });
+      return out;
+    }
+    function partir(fx) { var is = A.issue() || {}; S().dial = null; A.quitter(is.apres, fx || []); return "fin"; }
+    function aller(vers, fx) {
+      var c = cur(); vers = vers || "";
+      if (vers === "fin") return partir(fx);
+      if (vers.indexOf("p:") === 0) { S().dial = null; A.entrer(vers.slice(2), fx); return "sortie"; }
+      arriver(vers.indexOf("r:") === 0 ? vers.slice(2) : ((c.q.repliques || [])[0] || {}).id, fx);
+      return "suite";
+    }
+    function choisir(o) {
+      var c = cur(), rep = o.rep;
+      c.m.dits[o.key] = true; c.d.retour = false; c.d.sujet = null; c.d.toi = rep.texte || "…"; c.d.test = null;
+      var fx = A.fx(rep.effets), vers = rep.vers;
+      if (rep.test && rep.test.stat) {
+        var val = A.eff(rep.test.stat) + (+rep.test.modif || 0), r = A.rnd(20), ok = r <= val;
+        c.d.test = { r: r, ok: ok, val: val, stat: rep.test.stat };
+        if (!ok) vers = rep.versEchec;
+      }
+      return aller(vers, fx);
+    }
+    function sujets() {
+      var c = cur(); if (!c) return [];
+      if (!(c.q.sujets || []).length && !String(c.q.defaut || "").trim()) return [];
+      return (S().infos || []).map(function (iid) { return { info: iid, nom: A.nom("infos", iid), deja: !!c.m.sujets[iid] }; });
+    }
+    function demander(iid) {
+      var c = cur(), s = null;
+      (c.q.sujets || []).forEach(function (x) { if (!s && x.info === iid && A.cond(x.cond, x.ou)) s = x; });
+      var fx = s && !c.m.sujets[iid] ? A.fx(s.effets) : [];
+      c.m.sujets[iid] = true;
+      c.d.sujet = { info: iid, texte: s ? s.texte || "" : String(c.q.defaut || "").trim() || "…", connu: !!s };
+      c.d.toi = "À propos de : " + A.nom("infos", iid); c.d.test = null; c.d.fx = fx;
+    }
+    function texte() {
+      var c = cur(); if (!c) return "";
+      if (c.d.sujet) return c.d.sujet.texte;
+      if (c.d.retour && c.r && c.r === (c.q.repliques || [])[0]) return c.q.retour;
+      return c.r ? c.r.texte || "" : "";
+    }
+    function changerDispo(id, n) { var m = mem(id), avant = m.disp; m.disp = borne(m.disp + n); return (A.nomPnj(id) || "PNJ") + " : " + niveau(m.disp) + (m.disp !== avant ? " (" + (m.disp > avant ? "+" : "−") + Math.abs(m.disp - avant) + ")" : ""); }
+    return { mem: mem, niveau: niveau, cur: cur, ouvrir: ouvrir, reponses: reponses, choisir: choisir, sujets: sujets, demander: demander, partir: partir, texte: texte, changerDispo: changerDispo, fiche: fiche };
+  }
+  var DLG = NoyauDialogue({
+    etat: function () { return P; }, pnj: function (id) { return D.pnj[id]; }, cond: allOk, fx: applyFx, eff: eff, rnd: rnd, STATS: STATS,
+    nom: function (col, id) { return (D[col][id] || {}).nom || "?"; }, nomPnj: function (id) { return (D.pnj[id] || {}).nom; },
+    issue: function () { return (D.passages[P.cur] || {}).issue; },
+    entrer: function (pid, fx) { if (!D.passages[pid]) { P.fx = fx.concat(["(La réponse mène à un passage supprimé.)"]); rePv(); return; } enter(pid); P.fx = fx.concat(P.fx || []); rePv(); },
+    quitter: function (apres, fx) { if (apres && D.passages[apres] && apres !== P.cur) { enter(apres); P.fx = fx.concat(P.fx || []); } else P.fx = (P.fx || []).concat(fx); rePv(); }
+  });
+  function dialogueView(play) {
+    var c = DLG.cur(), box = h("div", { class: "sec dlg" });
+    if (!c) { P.dial = null; return box; }
+    var q = c.q, d = c.d, m = c.m, g = P.setup.genre;
+    box.appendChild(h("div", { class: "sec-h" }, h("strong", { class: play ? "cb-title" : null, text: q.nom || "PNJ" }), h("span", { class: "hint", text: "Disposition : " + DLG.niveau(m.disp) + " (" + m.disp + "/10)" + " · rencontre " + m.rencontres })));
+    if (q.desc && m.rencontres <= 1 && !d.toi && !d.sujet) box.appendChild(h("div", { class: "hint", style: "font-style:italic", html: richText(genre(q.desc, g)) }));
+    if (d.toi) box.appendChild(h("div", { class: "hint", text: "— " + genre(d.toi, g) }));
+    if (d.test) box.appendChild(h("p", { html: '<span class="die ' + (d.test.ok ? "ok" : "ko") + '">' + d.test.r + "</span>" + (d.test.ok ? '<span class="ok">Réussite</span>' : '<span class="ko">Échec</span>') + " (test de " + STATS[d.test.stat] + ", " + d.test.val + " ou moins)" }));
+    box.appendChild(h("div", { class: "pv-text dlg-ligne", html: richText(genre(DLG.texte() || "…", g)) }));
+    if ((d.fx || []).length) box.appendChild(h("div", { class: "pv-fx", text: d.fx.join(" · ") }));
+    DLG.reponses().forEach(function (o) {
+      var tag = o.tags.length ? "[" + o.tags.join("] [") + "] " : "";
+      box.appendChild(h("button", { class: "pv-choice", style: o.deja ? "opacity:.7" : null, disabled: o.ok ? null : "disabled", onclick: function () { var r = DLG.choisir(o); if (r === "suite") rePv(); } }, tag + genre(o.rep.texte || "(réponse sans texte)", g)));
+      if (!o.ok && o.rep.raison) box.appendChild(h("div", { class: "pv-reason", text: o.rep.raison }));
+    });
+    box.appendChild(h("button", { class: "pv-choice", style: "opacity:.8", onclick: function () { DLG.partir([]); } }, "← Prendre congé"));
+    var su = DLG.sujets();
+    if (su.length) box.appendChild(h("div", { class: "toolbar" }, h("span", { class: "hint", text: "Demander à propos de :" }), su.map(function (x) { return h("button", { class: "btn small", "aria-pressed": d.sujet && d.sujet.info === x.info ? "true" : "false", style: x.deja ? "opacity:.65" : null, onclick: function () { DLG.demander(x.info); rePv(); } }, x.nom); })));
     return box;
   }
 
@@ -1407,6 +1557,11 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       if (is.type === "choix") (is.choix || []).forEach(function (c) { link(p.id, c.cible, "choix", genre(c.texte || "", "m"), (c.cond || []).length > 0); });
       if (is.type === "test") { link(p.id, is.succes, "ok", "réussite"); link(p.id, is.echec, "ko", "échec"); }
       if (is.type === "combat") link(p.id, is.victoire, "ok", "victoire");
+      if (is.type === "dialogue") {
+        (is.choix || []).forEach(function (c) { link(p.id, c.cible, "choix", genre(c.texte || "", "m"), (c.cond || []).length > 0); });
+        if (is.apres) link(p.id, is.apres, "choix", "après la conversation", false);
+        pnjSorties(is.pnj).forEach(function (x) { link(p.id, x, "choix", "réponse de " + ((D.pnj[is.pnj] || {}).nom || "PNJ"), true); });
+      }
     });
     dagre.layout(g);
     var gw = g.graph().width || 400, gh = g.graph().height || 300;
@@ -1514,7 +1669,24 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     if (is.type === "choix") (is.choix || []).forEach(function (c) { if (c.cible) out.push(c.cible); });
     if (is.type === "test") { if (is.succes) out.push(is.succes); if (is.echec) out.push(is.echec); }
     if (is.type === "combat" && is.victoire) out.push(is.victoire);
+    if (is.type === "dialogue") {
+      (is.choix || []).forEach(function (c) { if (c.cible) out.push(c.cible); });
+      if (is.apres) out.push(is.apres);
+      pnjSorties(is.pnj).forEach(function (x) { out.push(x); });
+    }
     return out;
+  }
+  function pnjSorties(id) {
+    var q = D.pnj[id], out = [];
+    if (!q) return out;
+    (q.repliques || []).forEach(function (r) { (r.reponses || []).forEach(function (rp) { [rp.vers, rp.versEchec].forEach(function (v) { if (v && v.indexOf("p:") === 0) out.push(v.slice(2)); }); }); });
+    return out;
+  }
+  function pnjListes(q) {
+    var l = [];
+    (q.repliques || []).forEach(function (r) { l.push({ fx: r.effets, cond: [], ou: "la réplique « " + (r.nom || "?") + " »" }); (r.reponses || []).forEach(function (rp, i) { l.push({ fx: rp.effets, cond: rp.cond, ou: "la réponse " + (i + 1) + " de « " + (r.nom || "?") + " »" }); }); });
+    (q.sujets || []).forEach(function (su) { l.push({ fx: su.effets, cond: su.cond, ou: "le sujet « " + ((D.infos[su.info] || {}).nom || "?") + " »" }); });
+    return l;
   }
   function checks() {
     var out = [], ps = sortedPassages();
@@ -1522,6 +1694,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var given = { objets: {}, mots: {}, infos: {}, fragments: {} };
     function scanFx(list) { (list || []).forEach(function (f) { if (f.type === "donner") given.objets[f.val] = 1; if (f.type === "mot") given.mots[f.val] = 1; if (f.type === "info") given.infos[f.val] = 1; if (f.type === "fragment") given.fragments[f.val] = 1; }); }
     ps.forEach(function (p) { scanFx(p.effets); (p.segments || []).forEach(function (sg) { scanFx(sg.effets); }); ((p.issue || {}).choix || []).forEach(function (c) { scanFx(c.effets); }); scanFx((p.issue || {}).butin); });
+    Object.keys(D.pnj).forEach(function (k) { pnjListes(D.pnj[k]).forEach(function (x) { scanFx(x.fx); }); });
     var nums = {};
     ps.forEach(function (p) {
       if (!p.num) add("erreur", p, "Passage sans numéro.");
@@ -1549,6 +1722,11 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       } else if (is.type === "combat") {
         if (!is.ennemi || !D.ennemis[is.ennemi]) add("erreur", p, "Combat sans ennemi.");
         if (!is.victoire || !D.passages[is.victoire]) add("erreur", p, "Le combat n'a pas de passage pour la victoire.");
+      } else if (is.type === "dialogue") {
+        if (!is.pnj || !D.pnj[is.pnj]) add("erreur", p, "Dialogue sans personnage.");
+        if (!(is.choix || []).length && !(is.apres && D.passages[is.apres])) add("erreur", p, "Après la conversation, le joueur n'a aucun chemin : ajoute un choix ou un passage « Après Prendre congé ».");
+        (is.choix || []).forEach(function (c, i) { if (!c.cible || !D.passages[c.cible]) add("erreur", p, "Le choix " + (i + 1) + " ne mène nulle part."); });
+        if (is.apres && !D.passages[is.apres]) add("erreur", p, "« Après Prendre congé » mène à un passage supprimé.");
       } else if (is.type !== "fin") add("erreur", p, "Pas d'issue.");
       function scanCond(list, where, eff) {
         (list || []).forEach(function (c) {
@@ -1574,6 +1752,29 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     Object.keys(D.fragments || {}).forEach(function (k) { if (!given.fragments[k]) add("attention", null, "Fragment « " + (D.fragments[k].nom || "sans titre") + " » : rien ne le fait trouver dans le livre."); });
     Object.keys(D.mots).forEach(function (k) { var m = D.mots[k]; if (!m.effet) add("attention", null, "Mot « " + (m.nom || "sans nom") + " » : aucun effet de combat choisi. Il n'apparaîtra pas en combat (comme « récit »)."); });
     Object.keys(D.ennemis).forEach(function (k) { var e = D.ennemis[k]; if (!String(e.nom || "").trim()) add("attention", null, "Un ennemi du catalogue n'a pas de nom."); });
+    Object.keys(D.pnj).forEach(function (k) {
+      var q = D.pnj[k], nom = "PNJ « " + (q.nom || "sans nom") + " »", ids = {};
+      (q.repliques || []).forEach(function (r) { ids[r.id] = 1; });
+      if (!ps.some(function (p) { return (p.issue || {}).type === "dialogue" && p.issue.pnj === k; })) add("attention", null, nom + " : aucun passage ne permet de lui parler.");
+      if (!(q.repliques || []).length || !String((q.repliques[0] || {}).texte || "").trim()) add("attention", null, nom + " : sa réplique d'accueil est vide.");
+      (q.repliques || []).forEach(function (r) {
+        (r.reponses || []).forEach(function (rp, i) {
+          var ou = nom + ", « " + (r.nom || "?") + " », réponse " + (i + 1);
+          if (!String(rp.texte || "").trim()) add("attention", null, ou + " : pas de texte.");
+          [rp.vers, rp.test && rp.test.stat ? rp.versEchec : null].forEach(function (v) {
+            if (!v) return;
+            if (v.indexOf("r:") === 0 && !ids[v.slice(2)]) add("erreur", null, ou + " mène à une réplique supprimée.");
+            if (v.indexOf("p:") === 0 && !D.passages[v.slice(2)]) add("erreur", null, ou + " mène à un passage supprimé.");
+          });
+          (rp.cond || []).forEach(function (c) {
+            if (c.type === "objet" && c.val && !given.objets[c.val]) add("erreur", null, ou + " demande « " + ((D.objets[c.val] || {}).nom || "?") + " », que rien ne donne.");
+            if (c.type === "mot" && c.val && !given.mots[c.val]) add("erreur", null, ou + " demande le « " + ((D.mots[c.val] || {}).nom || "?") + " », que rien n'apprend.");
+            if (c.type === "info" && c.val && !given.infos[c.val]) add("erreur", null, ou + " demande l'information « " + ((D.infos[c.val] || {}).nom || "?") + " », que rien ne donne.");
+          });
+        });
+      });
+      (q.sujets || []).forEach(function (su, i) { if (!su.info) add("erreur", null, nom + " : le sujet " + (i + 1) + " n'a pas d'information choisie."); else if (!given.infos[su.info]) add("attention", null, nom + " : le sujet « " + ((D.infos[su.info] || {}).nom || "?") + " » ne sera jamais proposé, rien ne donne cette information."); });
+    });
     var dep = R().depart;
     var acts = {}; ps.forEach(function (p) { if (p.debutActe) acts[String(p.acte || "0")] = 1; });
     ["1", "2", "3"].forEach(function (a) { if (ps.some(function (p) { return String(p.acte) === a; }) && !acts[a]) add("attention", null, "L'acte " + ["", "I", "II", "III"][+a] + " n'a pas de passage « début d'acte » : pas de sauvegarde pour cet acte."); });
@@ -1642,6 +1843,11 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     infos: { titre: "Informations", un: "une information", fields: [
       ["nom", "Nom court (ex. : Le vrai nom de Mognus)", "text"], ["desc", "Ce que le joueur a appris", "area"], ["notes", "Notes", "area"]
     ] },
+    pnj: { titre: "PNJ", un: "un PNJ", fields: [
+      ["nom", "Nom (ex. : L'Ensevelie marchande)", "text"], ["disposition", "Disposition de départ (0 hostile · 5 neutre · 10 confiant)", "number"],
+      ["desc", "Description, affichée à la première rencontre", "area"], ["retour", "Accueil des rencontres suivantes (facultatif : remplace l'accueil)", "area"],
+      ["defaut", "Réponse aux sujets qu'il ne connaît pas (vide : on ne peut pas le questionner, sauf sujets écrits)", "area"], ["notes", "Notes", "area"]
+    ] },
     fragments: { titre: "Fragments de lore", un: "un fragment", fields: [
       ["nom", "Titre (ex. : Journal d'un moine, page déchirée)", "text"], ["collection", "Collection (ex. : Journal du moine) : regroupe les fragments dans le Carnet", "text"],
       ["ordre", "Ordre dans la collection", "number"], ["texte", "Texte du fragment (*italique*, paragraphes séparés par une ligne vide, mot·e et {m|f|n} acceptés)", "longarea"],
@@ -1654,6 +1860,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var side = h("aside", { class: "box sticky" });
     side.appendChild(h("div", { class: "list-tools" }, h("button", { class: "btn primary", onclick: function () {
       var id = uid(col.slice(0, 2)); D[col][id] = { id: id, nom: "" }; if (col === "ennemis") Object.assign(D[col][id], { def: 2, menace: 1, vig: 12, degats: "1d6+1", cycle1: "lourd, rapides, garde" });
+      if (col === "pnj") Object.assign(D[col][id], { disposition: 5, repliques: [{ id: uid("r"), nom: "Accueil", texte: "", reponses: [], effets: [] }], sujets: [] });
       UI.catSel[col] = id; saveLater(col, id); renderTabs(); render(); } }, "+ Ajouter " + sc.un)));
     var ul = h("ul", { class: "plist" });
     list.forEach(function (x) {
@@ -1700,10 +1907,96 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       grid.appendChild(f[2] === "bool" ? h("label", { class: "f inline" }, el, f[1]) : h("label", { class: "f", style: wide ? "grid-column:1/-1" : null }, f[1], el));
     });
     b.appendChild(grid);
+    if (col === "pnj") b.appendChild(pnjEditor(cur, touch));
     if (col === "ennemis") b.appendChild(h("details", { class: "help" }, h("summary", { text: "Rappel : le vocabulaire des intentions" }),
       h("p", { text: "Coup lourd : lever, armer, à deux mains, prendre de l'élan. Coups rapides : enchaîner, coups secs, rapprochés, harceler. Garde basse : vaciller, chercher son équilibre, reprendre son souffle. Incantation : lueur, murmure, paume, thanergie qui s'accumule. Une posture voilée ne laisse jamais que deux possibilités." })));
     main.appendChild(b);
     wrap.appendChild(main);
+    return wrap;
+  }
+  /* PNJ : répliques, réponses, sujets */
+  function pnjEditor(q, touch) {
+    function rr() { touch(); render(); }
+    q.repliques = q.repliques || []; q.sujets = q.sujets || [];
+    if (!q.repliques.length) q.repliques.push({ id: uid("r"), nom: "Accueil", texte: "", reponses: [], effets: [] });
+    var wrap = h("div", { class: "sec" });
+    function versOpts() {
+      return [["", "↩ revenir à l'accueil"], ["fin", "✕ prendre congé (fin de la conversation)"]]
+        .concat(q.repliques.map(function (r, i) { return ["r:" + r.id, "Réplique : " + (r.nom || (i ? "sans nom" : "Accueil"))]; }))
+        .concat(sortedPassages().map(function (x) { return ["p:" + x.id, "Quitter vers le passage " + (x.num || "?") + (x.titre ? " · " + x.titre : "")]; }));
+    }
+    function versPicker(o, k, label) {
+      return h("div", { class: "mini-row" }, h("span", { class: "hint", text: label }),
+        selectEl(versOpts(), o[k] || "", function (v) { o[k] = v; touch(); }),
+        h("button", { class: "btn small", title: "Crée une réplique vide et la relie ici", onclick: function () { var nr = { id: uid("r"), nom: "", texte: "", reponses: [], effets: [] }; q.repliques.push(nr); o[k] = "r:" + nr.id; UI.pnjFocus = nr.id; rr(); } }, "+ nouvelle réplique"),
+        o[k] && o[k].indexOf("r:") === 0 ? h("button", { class: "btn small", onclick: function () { var el = document.getElementById("rep-" + o[k].slice(2)); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); } }, "Voir ↓") : null);
+    }
+    function liens(rid) { var n = 0; q.repliques.forEach(function (r) { (r.reponses || []).forEach(function (rp) { if (rp.vers === "r:" + rid) n++; if (rp.versEchec === "r:" + rid) n++; }); }); return n; }
+    wrap.appendChild(h("div", { class: "sec-h" }, h("h3", { text: "Répliques" })));
+    wrap.appendChild(h("span", { class: "hint", text: "La conversation s'ouvre sur la première réplique (l'accueil). Chaque réplique propose des réponses au joueur ; « Prendre congé » est toujours possible. Les étiquettes [Malandrin], [Sagesse 12], [Cordial]… s'affichent d'elles-mêmes d'après les conditions." }));
+    q.repliques.forEach(function (r, ri) {
+      r.reponses = r.reponses || []; r.effets = r.effets || [];
+      var card = h("div", { class: "card", id: "rep-" + r.id, style: ri ? null : "border-left:3px solid var(--accent, #9a6b12)" });
+      card.appendChild(h("div", { class: "sec-h" },
+        h("input", { type: "text", value: r.nom || "", placeholder: ri ? "Nom de la réplique (pour t'y retrouver)" : "Accueil", style: "font-weight:700;max-width:340px", oninput: function (e) { r.nom = e.target.value; touch(); } }),
+        h("div", { class: "toolbar" },
+          h("span", { class: "hint", text: ri ? liens(r.id) + " lien(s) vers elle" : "accueil" }),
+          ri > 1 ? h("button", { class: "btn small", title: "Monter", onclick: function () { q.repliques.splice(ri - 1, 0, q.repliques.splice(ri, 1)[0]); rr(); } }, "↑") : null,
+          ri ? h("button", { class: "btn small danger", onclick: function () { q.repliques.splice(ri, 1); q.repliques.forEach(function (x) { (x.reponses || []).forEach(function (rp) { if (rp.vers === "r:" + r.id) rp.vers = ""; if (rp.versEchec === "r:" + r.id) rp.versEchec = ""; }); }); rr(); } }, "Retirer") : null)));
+      card.appendChild(h("textarea", { value: r.texte || "", placeholder: "Ce que dit le personnage… (*italique*, paragraphes séparés par une ligne vide, mot·e et {m|f|n} acceptés)", style: "min-height:90px", oninput: function (e) { r.texte = e.target.value; touch(); } }));
+      var fxd = h("details", { open: r.effets.length ? "open" : null }, h("summary", { class: "hint", text: "Effets la première fois que cette réplique est dite" + (r.effets.length ? " · " + r.effets.length : "") }));
+      fxd.appendChild(fxEditor(r.effets, touch, rr));
+      card.appendChild(fxd);
+      r.reponses.forEach(function (rp, i) {
+        rp.cond = rp.cond || []; rp.effets = rp.effets || [];
+        var rc = h("div", { class: "card", style: "margin-left:16px;background:var(--panel)" });
+        rc.appendChild(h("div", { class: "sec-h" }, h("strong", { text: "Réponse " + (i + 1) }),
+          h("div", { class: "toolbar" },
+            i > 0 ? h("button", { class: "btn small", title: "Monter", onclick: function () { r.reponses.splice(i - 1, 0, r.reponses.splice(i, 1)[0]); rr(); } }, "↑") : null,
+            h("button", { class: "btn small danger", onclick: function () { r.reponses.splice(i, 1); rr(); } }, "Retirer"))));
+        rc.appendChild(h("input", { type: "text", value: rp.texte || "", placeholder: "Ce que dit ton personnage, ex. : Que vendez-vous ?", oninput: function (e) { rp.texte = e.target.value; touch(); } }));
+        rc.appendChild(versPicker(rp, "vers", rp.test && rp.test.stat ? "si réussite, mène à" : "mène à"));
+        rc.appendChild(h("label", { class: "f inline" }, h("input", { type: "checkbox", checked: !!rp.unique, onchange: function (e) { rp.unique = e.target.checked; touch(); } }), "Une seule fois : la réponse disparaît une fois choisie (achat unique, révélation…)"));
+        var more = h("details", { open: rp.cond.length || rp.effets.length || (rp.test && rp.test.stat) ? "open" : null });
+        more.appendChild(h("summary", { class: "hint", text: "Conditions, effets et test" + (rp.cond.length ? " · " + rp.cond.length + " condition(s)" : "") + (rp.effets.length ? " · " + rp.effets.length + " effet(s)" : "") + (rp.test && rp.test.stat ? " · test" : "") }));
+        var inner = h("div", { class: "sec", style: "margin-top:8px" });
+        inner.appendChild(condEditor(rp.cond, touch, rr, "Cette réponse n'est proposée que si :", rp));
+        if (rp.cond.length) {
+          inner.appendChild(h("div", { class: "mini-row" }, h("span", { class: "hint", text: "Sinon :" }),
+            selectEl([["cache", "la réponse est cachée"], ["grise", "la réponse est grisée, avec une raison"]], rp.affichage || "cache", function (v) { rp.affichage = v; rr(); }),
+            rp.affichage === "grise" ? h("input", { type: "text", value: rp.raison || "", placeholder: "ex. : Il te faudrait plus d'or.", oninput: function (e) { rp.raison = e.target.value; touch(); } }) : null));
+          inner.appendChild(h("label", { class: "f inline" }, h("input", { type: "checkbox", checked: !!rp.discret, onchange: function (e) { rp.discret = e.target.checked; touch(); } }), "Discrète : ne pas afficher les étiquettes de ses conditions"));
+        }
+        inner.appendChild(h("span", { class: "hint", text: "Effets quand le joueur choisit cette réponse (à chaque fois). Pour un achat : condition « Possède Pièce d'or ≥ prix », effets « Retirer Pièce d'or × prix » puis « Donner »." }));
+        inner.appendChild(fxEditor(rp.effets, touch, rr));
+        inner.appendChild(h("div", { class: "mini-row" }, h("span", { class: "hint", text: "Test de parole :" }),
+          selectEl([["", "aucun test"]].concat(TEST_STATS.map(function (k) { return [k, STATS[k]]; })), (rp.test || {}).stat || "", function (v) { if (v) rp.test = { stat: v, modif: (rp.test || {}).modif || 0 }; else delete rp.test; rr(); }),
+          rp.test && rp.test.stat ? h("label", { class: "f inline" }, "modificateur", h("input", { type: "number", value: rp.test.modif || 0, oninput: function (e) { rp.test.modif = +e.target.value || 0; touch(); } })) : null));
+        if (rp.test && rp.test.stat) inner.appendChild(versPicker(rp, "versEchec", "si échec, mène à"));
+        more.appendChild(inner);
+        rc.appendChild(more);
+        card.appendChild(rc);
+      });
+      card.appendChild(h("div", null, h("button", { class: "btn small", onclick: function () { r.reponses.push({ id: uid("a"), texte: "", vers: "", cond: [], effets: [] }); rr(); } }, "+ réponse")));
+      wrap.appendChild(card);
+    });
+    wrap.appendChild(h("div", null, h("button", { class: "btn", onclick: function () { var nr = { id: uid("r"), nom: "", texte: "", reponses: [], effets: [] }; q.repliques.push(nr); UI.pnjFocus = nr.id; rr(); } }, "+ Ajouter une réplique")));
+    wrap.appendChild(h("div", { class: "sec-h", style: "margin-top:14px" }, h("h3", { text: "Sujets" })));
+    wrap.appendChild(h("span", { class: "hint", text: "Le joueur peut l'interroger sur toute information qu'il connaît, dans l'ordre qu'il veut. Écris ici ce que le personnage répond sur les sujets qui l'intéressent ; pour les autres, il donne sa « réponse aux sujets qu'il ne connaît pas »." }));
+    q.sujets.forEach(function (su, i) {
+      su.cond = su.cond || []; su.effets = su.effets || [];
+      var c = h("div", { class: "card" });
+      c.appendChild(h("div", { class: "sec-h" }, selectEl(catOpts("infos", "— information —"), su.info || "", function (v) { su.info = v; touch(); }),
+        h("button", { class: "btn small danger", onclick: function () { q.sujets.splice(i, 1); rr(); } }, "Retirer")));
+      c.appendChild(h("textarea", { value: su.texte || "", placeholder: "Ce qu'il en dit…", oninput: function (e) { su.texte = e.target.value; touch(); } }));
+      var more = h("details", { open: su.cond.length || su.effets.length ? "open" : null }, h("summary", { class: "hint", text: "Condition et effets (la première fois)" + (su.cond.length ? " · " + su.cond.length + " condition(s)" : "") + (su.effets.length ? " · " + su.effets.length + " effet(s)" : "") }));
+      more.appendChild(condEditor(su.cond, touch, rr, "Il n'en parle que si (sinon : sa réponse par défaut) :", su));
+      more.appendChild(fxEditor(su.effets, touch, rr));
+      c.appendChild(more);
+      wrap.appendChild(c);
+    });
+    wrap.appendChild(h("div", null, h("button", { class: "btn", onclick: function () { q.sujets.push({ info: "", texte: "", cond: [], effets: [] }); rr(); } }, "+ Ajouter un sujet")));
+    if (UI.pnjFocus) { var fid = UI.pnjFocus; UI.pnjFocus = null; setTimeout(function () { var el = document.getElementById("rep-" + fid); if (el) { el.scrollIntoView({ block: "start" }); var t = el.querySelector("input"); if (t) t.focus(); } }, 30); }
     return wrap;
   }
   function usageWhere(col, id) {
@@ -1715,7 +2008,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       var is = p.issue || {};
       (is.choix || []).forEach(function (c) { scan(c.cond); scan(c.effets); });
       scan(is.butin);
-      if (is.ennemi === id) hit = true;
+      if (is.ennemi === id || is.pnj === id) hit = true;
+      if (is.type === "dialogue" && D.pnj[is.pnj] && col !== "pnj") pnjListes(D.pnj[is.pnj]).forEach(function (x) { scan(x.fx); scan(x.cond); });
       return hit;
     }).map(function (p) { return p.id; });
   }
@@ -1730,7 +2024,9 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       (is.choix || []).forEach(function (c) { scan(c.cond); scan(c.effets); });
       scan(is.butin);
       if (col === "ennemis" && is.ennemi === id) n++;
+      if (col === "pnj" && is.pnj === id) n++;
     });
+    if (col !== "pnj") Object.keys(D.pnj).forEach(function (k) { pnjListes(D.pnj[k]).forEach(function (x) { scan(x.fx); scan(x.cond); }); (D.pnj[k].sujets || []).forEach(function (su) { if (su.info === id) n++; }); });
     return n;
   }
 
@@ -1933,7 +2229,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     chain.then(function () { return fetch("lecteur-modele.html"); }).then(function (res) { if (!res.ok) throw new Error("modele"); return res.text(); }).then(function (tpl) {
       delete r.exportActes;
       var livre = { id: slug(r.titre), demo: d.toLocaleDateString("fr-FR"), reglages: r, passages: ps };
-      ["objets", "mots", "infos", "fragments", "ennemis"].forEach(function (c) { livre[c] = {}; Object.keys(D[c]).forEach(function (id) { var o = clone(D[c][id]); delete o.notes; delete o.maj; livre[c][id] = o; }); });
+      ["objets", "mots", "infos", "fragments", "ennemis", "pnj"].forEach(function (c) { livre[c] = {}; Object.keys(D[c]).forEach(function (id) { var o = clone(D[c][id]); delete o.notes; delete o.maj; livre[c][id] = o; }); });
       var json = JSON.stringify(livre).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
       var html = tpl.split("__LIVRE_JSON__").join(json).split("{{TITRE}}").join(esc(r.titre || "Livre"));
       return downloads.save({ filename: slug(r.titre) + "-demo-" + stamp + ".html", data: html }).then(function () {
@@ -1961,6 +2257,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       if (is.type === "choix") (is.choix || []).forEach(function (c) { out.push("- " + genre(c.texte || "(sans texte)", g, "[Nom]") + " → " + (D.passages[c.cible] ? D.passages[c.cible].num : "?") + ((c.cond || []).length ? " *(si " + condTxt(c.cond) + ")*" : "")); });
       if (is.type === "test") out.push("- Test de " + STATS[is.stat || "hab"] + (is.modif ? " (" + is.modif + ")" : "") + " : réussite → " + ((D.passages[is.succes] || {}).num || "?") + ", échec → " + ((D.passages[is.echec] || {}).num || "?"));
       if (is.type === "combat") out.push("- Combat : " + ((D.ennemis[is.ennemi] || {}).nom || "?") + " ; victoire → " + ((D.passages[is.victoire] || {}).num || "?") + ((is.butin || []).length ? " ; butin : " + is.butin.length + " élément(s)" : ""));
+      if (is.type === "dialogue") { out.push("- Dialogue avec " + ((D.pnj[is.pnj] || {}).nom || "?") + (is.apres ? " ; après → " + ((D.passages[is.apres] || {}).num || "?") : "")); (is.choix || []).forEach(function (c) { out.push("- " + genre(c.texte || "(sans texte)", g, "[Nom]") + " → " + (D.passages[c.cible] ? D.passages[c.cible].num : "?")); }); }
       if (is.type === "fin") out.push("- **" + (is.fin || "Fin") + "** : " + (is.titreFin || ""));
       out.push("");
     });
@@ -2038,6 +2335,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       "<p><b>Les variations selon le personnage</b>, de deux façons, à combiner librement :</p><ul>",
       "<li><b>Un bloc conditionnel</b> dans le texte : un paragraphe qui ne s'affiche que si le personnage est, par exemple, Réfugié de Lorme, ou connaît une information.</li>",
       "<li><b>Un choix conditionnel</b> : un choix réservé à certains personnages, caché ou grisé avec une raison pour les autres.</li></ul>",
+      "<p><b>Les PNJ</b> se créent dans l'onglet PNJ : répliques, réponses du joueur (avec conditions, effets, test de parole), sujets sur lesquels l'interroger et disposition (0 à 10). Pour faire parler un PNJ, choisis « Un dialogue » comme fin de passage : le joueur ouvre la conversation dans une fenêtre, puis retrouve les choix du passage.</p>" +
       "<p><b>Les objets, Mots, informations et ennemis</b> se créent dans leurs onglets, puis se choisissent dans des listes. Une « information », c'est ce que le joueur a découvert : un indice, un nom, un secret (l'équivalent des mots-codes).</p>",
       "<p><b>L'aperçu</b> joue ton livre avec le vrai moteur. Change de genre, d'origine ou d'occupation pour vérifier tes variations.</p>",
       "<p><b>Les vérifications</b> listent les impasses, les liens cassés, les passages inaccessibles et les objets, Mots ou informations demandés mais jamais donnés. Définis ton passage de départ dans les Réglages pour qu'elles soient complètes.</p>",

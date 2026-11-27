@@ -191,6 +191,29 @@ button { cursor: pointer; }
 .victoire p { margin: 0; font-family: var(--police-recit); font-size: 19px; }
 .engager { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding-top: 6px; }
 .engager .label { color: var(--sang-clair); }
+.engager.parler .label { color: var(--texte-doux); }
+.dialogue .pnj-desc { margin: 0 0 12px; color: var(--texte-doux); font-style: italic; font-family: var(--police-recit); font-size: 17px; line-height: 1.5; }
+.dialogue .pnj-desc p { margin: 0 0 6px; }
+.dispo { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.dispo .j { flex: 0 1 160px; height: 8px; background: #18161c; border: 1px solid var(--trait); display: block; }
+.dispo .j i { display: block; height: 100%; background: var(--ivoire); }
+.dispo b { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+.dialogue .toi { margin: 14px 0 0; color: var(--texte-doux); font-family: var(--police-recit); font-size: 18px; }
+.replique .paroles { margin-top: 6px; font-family: var(--police-recit); font-style: italic; font-size: 21px; line-height: 1.45; }
+.replique .paroles p { margin: 0 0 8px; }
+.replique .paroles p:last-child { margin: 0; }
+.reponses { margin-top: 14px; }
+.reponses button { font-size: 17px; }
+.reponses button > span { display: flex; flex-direction: column; gap: 2px; }
+.reponses .tags { font-family: var(--police-ui); font-size: 12.5px; letter-spacing: .04em; color: var(--or, #c9a45a); }
+.reponses .bloque .tags { color: inherit; }
+.reponses button.deja { opacity: .72; }
+.reponses button.conge { background: transparent; color: var(--texte-doux); }
+.reponses button.conge::before { content: "◀"; }
+.sujets .liste-sujets { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.sujets .liste-sujets button { text-align: left; font-size: 14.5px; padding: 3px 0; }
+.sujets .liste-sujets button.deja { opacity: .6; }
+.sujets .liste-sujets button.actif { color: var(--ivoire); font-weight: 700; opacity: 1; }
 .butin { border: 1px solid var(--trait); border-radius: 6px; padding: 10px 14px; background: var(--surface); }
 .butin ul { margin: 6px 0 0; padding-left: 18px; font-family: var(--police-recit); font-size: 17px; }
 
@@ -373,7 +396,7 @@ img, .illus { image-rendering: pixelated; }
   var R = L.reglages || {};
   if (R.theme === "classique") { var th = document.getElementById("theme-crypte"); if (th) th.remove(); }
   R.origines = R.origines || []; R.occupations = R.occupations || [];
-  L.passages = L.passages || {}; L.objets = L.objets || {}; L.mots = L.mots || {}; L.infos = L.infos || {}; L.fragments = L.fragments || {}; L.ennemis = L.ennemis || {};
+  L.passages = L.passages || {}; L.objets = L.objets || {}; L.mots = L.mots || {}; L.infos = L.infos || {}; L.fragments = L.fragments || {}; L.ennemis = L.ennemis || {}; L.pnj = L.pnj || {};
   var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance", lum: "Lumière" };
   function LUMMAX() { return Math.max(1, +R.lumMax || 10); }
   var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
@@ -611,6 +634,7 @@ img, .illus { image-rendering: pixelated; }
       case "stat": return cmp(eff(c.stat || "for"));
       case "usure": return cmp(P.usure);
       case "compteur": return cmp(P.compteur);
+      case "dispo": var dp = c.val || (P.dial && P.dial.pid); return dp && L.pnj[dp] ? cmp(DLG.mem(dp).disp) : false;
     }
     return true;
   }
@@ -625,7 +649,7 @@ img, .illus { image-rendering: pixelated; }
       } else if (f.type === "retirer" && f.val) {
         P.inv[f.val] = Math.max(0, (P.inv[f.val] || 0) - (n || 1));
         if (!P.inv[f.val]) { delete P.inv[f.val]; Object.keys(P.eq).forEach(function (k) { if (P.eq[k] === f.val) delete P.eq[k]; }); }
-        o = L.objets[f.val]; out.push("− " + (o ? o.nom : "objet"));
+        o = L.objets[f.val]; out.push("− " + (o ? o.nom : "objet") + (n > 1 ? " ×" + n : ""));
         P.s.vig = Math.min(P.s.vig, eff("vigMax")); P.s.man = Math.min(P.s.man, eff("manMax"));
       } else if (f.type === "mot" && f.val && P.mots.indexOf(f.val) < 0) { P.mots.push(f.val); o = L.mots[f.val]; out.push("Mot appris : " + (o ? o.nom : "?")); }
       else if (f.type === "info" && f.val && P.infos.indexOf(f.val) < 0) { P.infos.push(f.val); o = L.infos[f.val]; out.push("Tu sais désormais : " + (o ? o.nom : "?")); }
@@ -654,6 +678,7 @@ img, .illus { image-rendering: pixelated; }
         out.push((lm.nom || "Mot") + " prononcé : " + [paye ? "−" + paye + " Mana" : "", reste ? "+" + reste + " Usure" : ""].filter(Boolean).join(", ") + (cout ? "" : "aucun coût"));
       }
       else if (f.type === "compteur") { P.compteur += n; }
+      else if (f.type === "dispo") { var dp = f.val || (P.dial && P.dial.pid); if (dp && L.pnj[dp]) out.push(DLG.changerDispo(dp, n)); }
     });
     return out;
   }
@@ -662,7 +687,7 @@ img, .illus { image-rendering: pixelated; }
   /* ---------- Navigation dans le livre ---------- */
   function entrer(pid, fxAvant) {
     var p = L.passages[pid];
-    P.combat = null; P.test = null;
+    P.combat = null; P.test = null; P.dial = null;
     if (!p) { P.cur = pid; P.horsDemo = true; UI.ecran = "demofin"; sauver(); render(); return; }
     var finTemp = P.cur && P.cur !== pid ? tempTick("passages") : [];
     if (P.lumOn && P.cur && P.cur !== pid) P.s.lum = Math.max(0, (P.s.lum || 0) - 1);
@@ -673,7 +698,7 @@ img, .illus { image-rendering: pixelated; }
       P.lus++;
     }
     P.vus[pid] = true;
-    if (p.debutActe) { var snap = clone(P); snap.save = null; snap.combat = null; snap.test = null; P.save = snap; }
+    if (p.debutActe) { var snap = clone(P); snap.save = null; snap.combat = null; snap.test = null; snap.dial = null; P.save = snap; }
     var is = p.issue || {};
     if (is.type === "combat") P.combat = nouveauCombat(is.ennemi);
     if (is.type === "fin") { UI.ecran = "fin"; noterFin(pid); }
@@ -695,7 +720,7 @@ img, .illus { image-rendering: pixelated; }
     });
   }
   function toutesFins() { return Object.keys(L.passages).filter(function (k) { return (L.passages[k].issue || {}).type === "fin"; }); }
-  function reprendreActe() { UI.fragNouv = []; var sv = P.save, morts = P.morts; P = clone(sv); P.save = sv; P.morts = morts; P.combat = null; P.test = null; var p = L.passages[P.cur]; if (p && (p.issue || {}).type === "combat") P.combat = nouveauCombat(p.issue.ennemi); P.fx = ["Tu reprends au début de l'acte."]; UI.ecran = "jeu"; sauver(); render(); window.scrollTo(0, 0); }
+  function reprendreActe() { UI.fragNouv = []; var sv = P.save, morts = P.morts; P = clone(sv); P.save = sv; P.morts = morts; P.combat = null; P.test = null; P.dial = null; var p = L.passages[P.cur]; if (p && (p.issue || {}).type === "combat") P.combat = nouveauCombat(p.issue.ennemi); P.fx = ["Tu reprends au début de l'acte."]; UI.ecran = "jeu"; sauver(); render(); window.scrollTo(0, 0); }
 
   /* ---------- Combat ---------- */
   function ennemi(id) { return L.ennemis[id] || null; }
@@ -820,6 +845,7 @@ img, .illus { image-rendering: pixelated; }
     else if (UI.modal === "fins") calque.appendChild(modalFins());
     else if (UI.modal === "carnet") calque.appendChild(modalCarnet());
     else if (UI.modal === "menu") calque.appendChild(modalMenu());
+    else if (UI.ecran === "jeu" && P && P.dial) calque.appendChild(fenetreDialogue());
     else if (UI.ecran === "jeu" && P && P.combat && !P.combat.manque && (P.combat.engage || (P.combat.journal || []).length)) calque.appendChild(fenetreCombat());
     var focus = calque.querySelector("[data-focus]") || app.querySelector("[data-focus]");
     if (focus) focus.focus({ preventScroll: true });
@@ -978,7 +1004,12 @@ img, .illus { image-rendering: pixelated; }
     (p.segments || []).forEach(function (sg, i) { if (i === 0 || tousOk(sg.cond, sg.ou)) r.insertAdjacentHTML("beforeend", riche(sg.texte)); });
     a.appendChild(r);
     var is = p.issue || {};
-    if (is.type === "choix") {
+    if (is.type === "dialogue") {
+      var qp = L.pnj[is.pnj];
+      if (!qp) a.appendChild(h("p", { class: "vide", text: "(Dialogue sans personnage : passage à compléter dans l'atelier.)" }));
+      else { var mp = (P.pnj || {})[is.pnj]; a.appendChild(h("div", { class: "engager parler" }, h("button", { class: "b-prim", "data-focus": true, onclick: parler }, genre(is.bouton || ((mp && mp.rencontres ? "Reparler à " : "Parler à ") + (qp.nom || "…")))), mp ? h("span", { class: "label", text: "Disposition : " + DLG.niveau(mp.disp) }) : null)); }
+    }
+    if (is.type === "choix" || is.type === "dialogue") {
       var nav = h("nav", { class: "choix", "aria-label": "Choix" }), n = 0;
       (is.choix || []).forEach(function (c) {
         var ok = tousOk(c.cond, c.ou);
@@ -987,7 +1018,7 @@ img, .illus { image-rendering: pixelated; }
         if (ok && c.cible) nav.appendChild(h("button", { onclick: function () { aller(c.cible, c.effets); } }, genre(c.texte || "…")));
         else nav.appendChild(h("div", { class: "bloque" }, h("s", { text: genre(c.texte || "…") }), c.raison ? h("em", { text: genre(c.raison) }) : null));
       });
-      if (!n) nav.appendChild(h("p", { class: "vide", text: "Aucun chemin ne s'ouvre à toi ici." }));
+      if (!n && is.type === "choix") nav.appendChild(h("p", { class: "vide", text: "Aucun chemin ne s'ouvre à toi ici." }));
       a.appendChild(nav);
     } else if (is.type === "test") {
       var val = eff(is.stat || "hab") + (+is.modif || 0), t = P.test;
@@ -1049,6 +1080,142 @@ img, .illus { image-rendering: pixelated; }
     corps.appendChild(j);
     return h("div", { class: "voile" }, h("section", { class: "fenetre", role: "dialog", "aria-modal": "true", "aria-label": "Combat" },
       h("header", null, h("h2", { class: "titre-f", text: "Combat" }), h("span", { class: "ko", style: "font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase", text: "Pas de fuite" })), corps));
+  }
+
+  /* ---------- Dialogues : noyau commun (atelier et jeu) ---------- */
+  function NoyauDialogue(A) {
+    var NIV = ["Hostile", "Hostile", "Méfiant", "Méfiant", "Réservé", "Neutre", "Cordial", "Cordial", "Amical", "Confiant", "Confiant"];
+    function S() { return A.etat(); }
+    function fiche(id) { return id ? A.pnj(id) || null : null; }
+    function borne(n) { return Math.max(0, Math.min(10, n)); }
+    function mem(id) {
+      var s = S(); s.pnj = s.pnj || {};
+      if (!s.pnj[id]) { var q = fiche(id) || {}, d0 = q.disposition; s.pnj[id] = { disp: d0 === "" || d0 == null ? 5 : borne(+d0 || 0), dits: {}, sujets: {}, vus: {}, rencontres: 0 }; }
+      return s.pnj[id];
+    }
+    function niveau(n) { return NIV[borne(Math.round(+n || 0))]; }
+    function repl(q, rid) { var l = q.repliques || []; for (var i = 0; i < l.length; i++) if (l[i].id === rid) return l[i]; return l[0] || null; }
+    function cur() { var d = S() && S().dial; if (!d) return null; var q = fiche(d.pid); if (!q) return null; return { d: d, q: q, m: mem(d.pid), r: repl(q, d.rid) }; }
+    function arriver(rid, fx) {
+      var c = cur(), r = repl(c.q, rid);
+      c.d.rid = r ? r.id : null;
+      if (r && !c.m.vus[r.id]) { c.m.vus[r.id] = true; fx = fx.concat(A.fx(r.effets)); }
+      c.d.fx = fx;
+    }
+    function ouvrir(pid) {
+      var q = fiche(pid); if (!q) return false;
+      var m = mem(pid);
+      S().dial = { pid: pid, rid: null, toi: null, fx: [], sujet: null, test: null, retour: m.rencontres > 0 && !!String(q.retour || "").trim() };
+      m.rencontres++;
+      arriver(((q.repliques || [])[0] || {}).id, []);
+      return true;
+    }
+    function court(nom) { var w = String(nom || "").replace(/^(la |le |les |l')/i, "").split(/\s+/); return w[0] || String(nom || ""); }
+    function etiquettes(rep) {
+      var t = [];
+      if (!rep.discret) (rep.cond || []).forEach(function (c) {
+        var op = c.op || ">=";
+        if (c.type === "occupation" && c.val) t.push(court(c.val));
+        else if (c.type === "origine" && c.val) t.push(c.val);
+        else if (c.type === "stat" && op === ">=") t.push((A.STATS[c.stat || "for"] || "") + " " + (+c.n || 0));
+        else if (c.type === "mot" && c.val) t.push(A.nom("mots", c.val));
+        else if (c.type === "objet" && c.val) t.push(A.nom("objets", c.val) + ((+c.n || 1) > 1 ? " ×" + c.n : ""));
+        else if (c.type === "dispo" && op === ">=") t.push(niveau(+c.n || 0));
+      });
+      if (rep.test && rep.test.stat) t.push(A.STATS[rep.test.stat] + " : " + (A.eff(rep.test.stat) + (+rep.test.modif || 0)) + " ou moins au d20");
+      return t;
+    }
+    function reponses() {
+      var c = cur(); if (!c || !c.r) return [];
+      var out = [];
+      (c.r.reponses || []).forEach(function (rep, i) {
+        var key = c.r.id + ":" + (rep.id || i);
+        if (rep.unique && c.m.dits[key]) return;
+        var ok = A.cond(rep.cond, rep.ou);
+        if (!ok && (rep.affichage || "cache") === "cache") return;
+        out.push({ rep: rep, key: key, ok: ok, tags: etiquettes(rep), deja: !!c.m.dits[key] });
+      });
+      return out;
+    }
+    function partir(fx) { var is = A.issue() || {}; S().dial = null; A.quitter(is.apres, fx || []); return "fin"; }
+    function aller(vers, fx) {
+      var c = cur(); vers = vers || "";
+      if (vers === "fin") return partir(fx);
+      if (vers.indexOf("p:") === 0) { S().dial = null; A.entrer(vers.slice(2), fx); return "sortie"; }
+      arriver(vers.indexOf("r:") === 0 ? vers.slice(2) : ((c.q.repliques || [])[0] || {}).id, fx);
+      return "suite";
+    }
+    function choisir(o) {
+      var c = cur(), rep = o.rep;
+      c.m.dits[o.key] = true; c.d.retour = false; c.d.sujet = null; c.d.toi = rep.texte || "…"; c.d.test = null;
+      var fx = A.fx(rep.effets), vers = rep.vers;
+      if (rep.test && rep.test.stat) {
+        var val = A.eff(rep.test.stat) + (+rep.test.modif || 0), r = A.rnd(20), ok = r <= val;
+        c.d.test = { r: r, ok: ok, val: val, stat: rep.test.stat };
+        if (!ok) vers = rep.versEchec;
+      }
+      return aller(vers, fx);
+    }
+    function sujets() {
+      var c = cur(); if (!c) return [];
+      if (!(c.q.sujets || []).length && !String(c.q.defaut || "").trim()) return [];
+      return (S().infos || []).map(function (iid) { return { info: iid, nom: A.nom("infos", iid), deja: !!c.m.sujets[iid] }; });
+    }
+    function demander(iid) {
+      var c = cur(), s = null;
+      (c.q.sujets || []).forEach(function (x) { if (!s && x.info === iid && A.cond(x.cond, x.ou)) s = x; });
+      var fx = s && !c.m.sujets[iid] ? A.fx(s.effets) : [];
+      c.m.sujets[iid] = true;
+      c.d.sujet = { info: iid, texte: s ? s.texte || "" : String(c.q.defaut || "").trim() || "…", connu: !!s };
+      c.d.toi = "À propos de : " + A.nom("infos", iid); c.d.test = null; c.d.fx = fx;
+    }
+    function texte() {
+      var c = cur(); if (!c) return "";
+      if (c.d.sujet) return c.d.sujet.texte;
+      if (c.d.retour && c.r && c.r === (c.q.repliques || [])[0]) return c.q.retour;
+      return c.r ? c.r.texte || "" : "";
+    }
+    function changerDispo(id, n) { var m = mem(id), avant = m.disp; m.disp = borne(m.disp + n); return (A.nomPnj(id) || "PNJ") + " : " + niveau(m.disp) + (m.disp !== avant ? " (" + (m.disp > avant ? "+" : "−") + Math.abs(m.disp - avant) + ")" : ""); }
+    return { mem: mem, niveau: niveau, cur: cur, ouvrir: ouvrir, reponses: reponses, choisir: choisir, sujets: sujets, demander: demander, partir: partir, texte: texte, changerDispo: changerDispo, fiche: fiche };
+  }
+  var DLG = NoyauDialogue({
+    etat: function () { return P; }, pnj: function (id) { return L.pnj[id]; }, cond: tousOk, fx: appliquer, eff: eff, rnd: rnd, STATS: STATS,
+    nom: function (col, id) { return (L[col][id] || {}).nom || "?"; }, nomPnj: function (id) { return (L.pnj[id] || {}).nom; },
+    issue: function () { return (L.passages[P.cur] || {}).issue; },
+    entrer: function (pid, fx) { entrer(pid, fx); },
+    quitter: function (apres, fx) { if (apres && L.passages[apres] && apres !== P.cur) entrer(apres, fx); else { P.fx = (P.fx || []).concat(fx); sauver(); render(); } }
+  });
+  function parler() { var is = L.passages[P.cur].issue || {}; if (DLG.ouvrir(is.pnj)) { sauver(); render(); } }
+  function apresReplique(res) { if (res !== "suite") return; if (P.s.vig <= 0) { P.dial = null; mourir(); } sauver(); render(); }
+  function fenetreDialogue() {
+    var c = DLG.cur(); if (!c) { P.dial = null; return h("div"); }
+    var q = c.q, d = c.d, m = c.m;
+    var corps = h("div", { class: "corps combat dialogue" }), g = h("div");
+    var premier = m.rencontres <= 1 && !d.toi && !d.sujet;
+    if (q.desc && premier) g.appendChild(h("div", { class: "pnj-desc", html: riche(q.desc) }));
+    g.appendChild(h("div", { class: "dispo", title: "Disposition : ce que ce personnage pense de toi" }, h("span", { class: "label", text: "Disposition" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(10 * m.disp) + "%" })), h("b", { text: DLG.niveau(m.disp) })));
+    if (d.toi) g.appendChild(h("p", { class: "toi", text: "— " + genre(d.toi) }));
+    if (d.test) g.appendChild(h("p", { class: "gains", html: "Test de " + STATS[d.test.stat] + " : <span class=\"dé " + (d.test.ok ? "ok" : "ko") + "\">" + d.test.r + "</span>" + (d.test.ok ? "réussite" : "échec") + " (" + d.test.val + " ou moins)" }));
+    g.appendChild(h("div", { class: "intention replique" }, h("span", { class: "label", text: q.nom || "PNJ" }), h("div", { class: "paroles", html: riche(DLG.texte() || "…") })));
+    if ((d.fx || []).length) g.appendChild(h("p", { class: "gains", text: d.fx.filter(Boolean).join(" · ") }));
+    var nav = h("nav", { class: "choix reponses", "aria-label": "Tes réponses" }), premierBtn = true;
+    DLG.reponses().forEach(function (o) {
+      var tags = o.tags.length ? h("small", { class: "tags", text: o.tags.map(function (t) { return "[" + t + "]"; }).join(" ") }) : null;
+      if (o.ok) nav.appendChild(h("button", { class: o.deja ? "deja" : null, "data-focus": premierBtn ? true : null, onclick: function () { apresReplique(DLG.choisir(o)); } }, h("span", null, tags, h("span", { text: genre(o.rep.texte || "…") }))));
+      else nav.appendChild(h("div", { class: "bloque" }, tags, h("s", { text: genre(o.rep.texte || "…") }), o.rep.raison ? h("em", { text: genre(o.rep.raison) }) : null));
+      if (o.ok) premierBtn = false;
+    });
+    nav.appendChild(h("button", { class: "conge", "data-focus": premierBtn ? true : null, onclick: function () { DLG.partir([]); } }, "Prendre congé"));
+    g.appendChild(nav);
+    corps.appendChild(g);
+    var su = DLG.sujets(), j = h("aside", { class: "journal sujets", "aria-label": "Sujets de conversation" }, h("p", { class: "label", text: "Demander à propos de…" }));
+    if (!su.length) j.appendChild(h("p", { class: "vide", text: (q.sujets || []).length || String(q.defaut || "").trim() ? "Tu ne sais encore rien dont lui parler." : "Ce personnage ne se laisse pas questionner." }));
+    var ul = h("div", { class: "liste-sujets" });
+    su.forEach(function (x) { ul.appendChild(h("button", { class: "b-lien" + (x.deja ? " deja" : "") + (d.sujet && d.sujet.info === x.info ? " actif" : ""), onclick: function () { DLG.demander(x.info); sauver(); render(); } }, x.nom)); });
+    j.appendChild(ul);
+    corps.appendChild(j);
+    return h("div", { class: "voile" }, h("section", { class: "fenetre", role: "dialog", "aria-modal": "true", "aria-label": "Conversation avec " + (q.nom || "PNJ") },
+      h("header", null, h("h2", { class: "titre-f", text: q.nom || "Conversation" }), h("span", { class: "label", text: m.rencontres > 1 ? "Rencontre n° " + m.rencontres : "Première rencontre" })), corps));
   }
 
   /* ---------- Fenêtres ---------- */
