@@ -238,7 +238,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance", lum: "Lumière" };
   function LUMMAX() { return Math.max(1, +(R().lumMax) || 10); }
   var TEST_STATS = ["for", "hab", "sag", "cha"];
-  var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
+  var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" , soutien: "Soutien", entrave: "Entravé" };
   var STATUTS = { afaire: "À écrire", brouillon: "Brouillon", ecrit: "Écrit", relu: "Relu" };
   var FINS = ["Bonne fin", "Fin douce-amère", "Mauvaise fin", "Fin d'évasion", "Échec", "Mort"];
   var COLS = ["passages", "objets", "mots", "infos", "fragments", "ennemis", "pnj"];
@@ -842,7 +842,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         targetPicker(is, "echec", touch, rerender, "Échec →")));
     } else if (is.type === "combat") {
       box.appendChild(h("div", { class: "card" },
-        h("label", { class: "f" }, "Ennemi", selectEl(catOpts("ennemis", "— choisir un ennemi —"), is.ennemi || "", function (v) { is.ennemi = v; touch(); })),
+        foesEditor(is, touch, rerender),
         targetPicker(is, "victoire", touch, rerender, "Victoire →"),
         h("span", { class: "hint", text: "Pas de fuite une fois le combat engagé. En cas de défaite, le joueur reprend au début de l'acte." })));
       is.butin = is.butin || [];
@@ -1095,7 +1095,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     var secours = secoursLumiere(); if (secours) P.fx = (P.fx || []).concat(secours);
     P.vus[pid] = true;
     if (p.debutActe) { var snap = JSON.parse(JSON.stringify(P)); snap.save = null; snap.combat = null; snap.test = null; P.save = snap; P.fx = P.fx.concat(["Sauvegarde : début de l'acte"]); }
-    if (p.issue && p.issue.type === "combat") P.combat = newCombat(p.issue.ennemi);
+    if (p.issue && p.issue.type === "combat") P.combat = newCombat(p.issue);
   }
   function go(pid, fx) {
     if (!pid || !D.passages[pid]) return;
@@ -1364,29 +1364,37 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     return box;
   }
 
-  /* ---------- Combat (système des intentions) ---------- */
+  /* ---------- Combat (système des intentions, aperçu simplifié : sans talents ni familles d'armes) ---------- */
   function foeDef(id) { return D.ennemis[id] || null; }
-  function newCombat(eid) {
-    var e = foeDef(eid);
-    if (!e) return { missing: true };
-    var c = { eid: eid, vig: +e.vig || 10, max: +e.vig || 10, turn: 1, idx: 0, phase: 1, log: [], over: null };
-    newTurn(c);
+  function foesOf(is) { var l = (is.ennemis || []).filter(function (id) { return id && foeDef(id); }); if (!l.length && is.ennemi && foeDef(is.ennemi)) l = [is.ennemi]; return l.slice(0, 3); }
+  function newCombat(is) {
+    var ids = foesOf(is || {}); if (!ids.length) return { missing: true };
+    var nb = {}, seen = {}; ids.forEach(function (id) { nb[id] = (nb[id] || 0) + 1; });
+    var c = { turn: 1, log: [], over: null, target: 0, foes: ids.map(function (id) { var e = foeDef(id); seen[id] = (seen[id] || 0) + 1; return { eid: id, nom: (e.nom || "Ennemi") + (nb[id] > 1 ? " " + "ABC"[seen[id] - 1] : ""), vig: +e.vig || 10, max: +e.vig || 10, idx: 0, phase: 1 }; }) };
+    c.foes.forEach(newTurn);
+    var m = c.foes.filter(function (x) { return (foeDef(x.eid) || {}).role === "meneur"; })[0]; if (m && c.foes.length > 1) c.target = c.foes.indexOf(m);
     return c;
   }
-  function cycleOf(e, c) {
+  function alive(c) { return c.foes.filter(function (x) { return x.vig > 0; }); }
+  function fixTarget(c) { if (!c.foes[c.target] || c.foes[c.target].vig <= 0) { var a = alive(c)[0]; if (a) c.target = c.foes.indexOf(a); } }
+  function cycleOf(e, x) {
     var c2 = lines(String(e.cycle2 || "").replace(/,/g, "\n"));
     var c1 = lines(String(e.cycle1 || "lourd, rapides, garde").replace(/,/g, "\n"));
-    var list = c.phase === 2 && c2.length ? c2 : c1;
-    return list.map(function (x) { x = x.toLowerCase(); return x.indexOf("lourd") >= 0 ? "lourd" : x.indexOf("rapide") >= 0 ? "rapides" : x.indexOf("garde") >= 0 ? "garde" : x.indexOf("incant") >= 0 ? "incant" : "lourd"; });
+    var list = x.phase === 2 && c2.length ? c2 : c1;
+    return list.map(function (k) { k = k.toLowerCase(); return k.indexOf("lourd") >= 0 ? "lourd" : k.indexOf("rapide") >= 0 ? "rapides" : k.indexOf("garde") >= 0 ? "garde" : k.indexOf("incant") >= 0 ? "incant" : k.indexOf("soutien") >= 0 || k.indexOf("soin") >= 0 ? "soutien" : "lourd"; });
   }
-  function newTurn(c) {
-    var e = foeDef(c.eid), cy = cycleOf(e, c);
-    c.it = cy[c.idx % cy.length];
-    c.revealed = !e.voile; c.observed = false;
-    c.said = pick(lines(e["ph_" + c.it])) || INTENTS[c.it] + ".";
-    var veil = c.it === "lourd" || c.it === "rapides" ? e.voile_a : e.voile_b;
-    c.veilSaid = pick(lines(veil)) || "Tu ne parviens pas à lire son geste.";
+  function newTurn(x) {
+    var e = foeDef(x.eid); x.observed = false;
+    if (x.bound) { x.bound = 0; x.it = "entrave"; x.revealed = true; x.said = "Entravé : il ne peut pas agir ce tour."; x.veilSaid = x.said; return; }
+    var cy = cycleOf(e, x);
+    x.it = cy[x.idx % cy.length];
+    x.revealed = !e.voile;
+    x.said = pick(lines(e["ph_" + x.it])) || (x.it === "soutien" ? "Il se tourne vers un allié blessé." : INTENTS[x.it] + ".");
+    var veil = x.it === "lourd" || x.it === "rapides" ? e.voile_a : e.voile_b;
+    x.veilSaid = pick(lines(veil)) || "Tu ne parviens pas à lire son geste.";
   }
+  function effIt(it) { return it === "soutien" || it === "entrave" ? "garde" : it; }
+  function leaderNear(c, x) { return c.foes.some(function (y) { return y !== x && y.vig > 0 && (foeDef(y.eid) || {}).role === "meneur"; }); }
   function weapon() {
     var o = occOf(P.setup.occupation) || {};
     var w = { nom: o.arme || "Arme", txt: o.degats || "1d6", dmg: parseDice(o.degats || "1d6"), atk: o.attaque || "for", armure: +o.armure || 0, parade: +o.parade || 0 };
@@ -1400,37 +1408,46 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
   function combatView(is) {
     var c = P.combat, box = h("div", { class: "sec" });
     if (!c || c.missing) { box.appendChild(h("p", { class: "ko", text: "Aucun ennemi choisi pour ce combat." })); return box; }
-    var e = foeDef(c.eid), w = weapon(), s = P.s;
+    if (!c.foes) { P.combat = c = newCombat(is); }
+    fixTarget(c);
+    var x = c.foes[c.target], e = foeDef(x.eid), w = weapon(), s = P.s, group = c.foes.length > 1;
     var tuto = !!e.tutoriel;
-    box.appendChild(h("div", { class: "sec-h" }, h("strong", { text: e.nom || "Ennemi" }), UI.view === "jouer" ? null : h("span", { class: "hint", text: "Déf " + (e.def || 0) + " · Menace " + (e.menace || 0) + " · " + (e.degats || "1d6") })));
-    box.appendChild(h("div", { class: "bar" }, h("i", { style: "width:" + (100 * c.vig / c.max) + "%" })));
-    box.appendChild(h("div", { class: "hint", text: "Vigueur ennemie " + c.vig + "/" + c.max + " · ta Vigueur " + s.vig + "/" + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }));
+    if (group && c.over !== "win") box.appendChild(h("div", { class: "toolbar" }, h("span", { class: "hint", text: "Cible :" }), c.foes.map(function (y, i) {
+      var dead = y.vig <= 0;
+      return h("button", { class: "btn small", disabled: dead ? "disabled" : null, "aria-pressed": i === c.target ? "true" : "false", onclick: function () { c.target = i; refreshPv(); } },
+        y.nom + " · " + (dead ? "à terre" : y.vig + "/" + y.max + " · " + (y.revealed || tuto ? INTENTS[y.it] : "voilé")) + ((foeDef(y.eid) || {}).role ? " · " + foeDef(y.eid).role : ""));
+    })));
+    box.appendChild(h("div", { class: "sec-h" }, h("strong", { text: x.nom }), UI.view === "jouer" ? null : h("span", { class: "hint", text: "Déf " + (e.def || 0) + " · Menace " + (e.menace || 0) + (leaderNear(c, x) ? " +1 (meneur)" : "") + " · " + (e.degats || "1d6") })));
+    box.appendChild(h("div", { class: "bar" }, h("i", { style: "width:" + (100 * x.vig / x.max) + "%" })));
+    box.appendChild(h("div", { class: "hint", text: "Vigueur ennemie " + x.vig + "/" + x.max + " · ta Vigueur " + s.vig + "/" + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }));
     if (c.over === "win") {
-      box.appendChild(h("p", { class: "ok", text: e.mort ? genre(e.mort, P.setup.genre) : "Victoire." }));
+      box.appendChild(h("p", { class: "ok", text: group ? "Le dernier d'entre eux s'effondre." : e.mort ? genre(e.mort, P.setup.genre) : "Victoire." }));
       if ((c.butin || []).length) box.appendChild(h("div", { class: "card" }, h("strong", { text: "Butin" }), h("ul", { style: "margin:4px 0 0;padding-left:18px" }, c.butin.map(function (t) { return h("li", { text: t }); }))));
       box.appendChild(is.victoire ? h("button", { class: "pv-choice", onclick: function () { go(is.victoire); } }, "Continuer") : h("p", { class: "ko", text: "Aucun passage n'est relié à la victoire." }));
     } else if (!c.over) {
-      box.appendChild(h("div", { class: "cb-intent", text: genre(c.revealed ? c.said : c.veilSaid, P.setup.genre) }));
-      if (tuto) box.appendChild(h("div", { class: "hint", html: "<b>" + INTENTS[c.it] + "</b> · aides affichées : combat d'apprentissage" }));
-      var t = targetsFor(c, e, w, tuto);
+      box.appendChild(h("div", { class: "cb-intent", text: genre(x.revealed ? x.said : x.veilSaid, P.setup.genre) }));
+      if (tuto) box.appendChild(h("div", { class: "hint", html: "<b>" + INTENTS[x.it] + "</b> · aides affichées : combat d'apprentissage" }));
+      var t = targetsFor(c, x, e, w, tuto);
       var acts = h("div", { class: "cb-acts" });
       function btn(a, l, sub, dis) { acts.appendChild(h("button", { disabled: dis ? "disabled" : null, onclick: function () { combatAct(a, is); } }, l, h("small", { text: sub }))); }
       btn("frapper", "Frapper", STATS[w.atk] + " · " + t.frapper);
       btn("esquiver", "Esquiver", "Habileté · " + t.esquiver);
       btn("parer", "Parer", "Force · " + (t.parer === null ? "impossible" : t.parer));
-      btn("prudente", "Garde prudente", "moitié des dégâts");
-      btn("observer", "Observer", c.observed ? "déjà tenté" : !e.voile ? "inutile ici" : "Sagesse · " + eff("sag"), c.observed || !e.voile);
+      btn("prudente", "Garde prudente", group ? "moitié des dégâts, flancs compris" : "moitié des dégâts");
+      btn("observer", "Observer", x.observed ? "déjà tenté" : !e.voile ? "inutile ici" : "Sagesse · " + eff("sag"), x.observed || !e.voile);
       P.mots.forEach(function (mid) { var m = D.mots[mid]; if (!m || !m.effet || m.effet === "recit") return; btn("mot:" + mid, m.nom, (m.cout || 0) + " Mana"); });
       box.appendChild(acts);
+      if (group) box.appendChild(h("div", { class: "hint", text: "Les ennemis non ciblés frappent de flanc : moitié de leurs dégâts (un quart en garde prudente), sorts en entier." }));
     }
     var log = h("ol", { class: "cb-log", "aria-live": "polite" });
     c.log.forEach(function (l) { log.appendChild(h("li", { html: l })); });
     box.appendChild(log);
     return box;
   }
-  function targetsFor(c, e, w, tuto) {
-    var s = P.s, it = c.it;
-    var t = { frapper: eff(w.atk) - (+e.def || 0), esquiver: eff("hab") - (+e.menace || 0), parer: eff("for") - (+e.menace || 0) + w.parade };
+  function refreshPv() { var el = document.getElementById("previewBox"); el.replaceWith(previewPanel()); }
+  function targetsFor(c, x, e, w, tuto) {
+    var it = effIt(x.it), men = (+e.menace || 0) + (leaderNear(c, x) ? 1 : 0);
+    var t = { frapper: eff(w.atk) - (+e.def || 0), esquiver: eff("hab") - men, parer: eff("for") - men + w.parade };
     if (tuto) {
       if (it === "garde") t.frapper += 3;
       if (it === "rapides" || it === "incant") t.esquiver -= 3;
@@ -1440,42 +1457,43 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
     return t;
   }
   function combatAct(a, is) {
-    var c = P.combat, e = foeDef(c.eid), w = weapon(), s = P.s, it = c.it, L = [];
-    var real = targetsFor(c, e, w, true);
+    var c = P.combat, x = c.foes[c.target], e = foeDef(x.eid), w = weapon(), s = P.s, it = effIt(x.it), L = [], group = c.foes.length > 1, careful = false, cancelled = false;
+    var real = targetsFor(c, x, e, w, true);
     function die(r, ok) { return '<span class="die ' + (ok ? "ok" : "ko") + '">' + r + "</span>"; }
     function test(target, label) { var r = rnd(20), ok = target !== null && r <= target; L.push(die(r, ok) + label + " (" + r + (ok ? " ≤ " : " > ") + (target === null ? "—" : target) + ")"); return ok; }
-    function foeHit() {
-      if (it === "incant") return roll(parseDice(e.sort || "2d4+2"));
-      return Math.max(0, roll(parseDice(e.degats || "1d6")) + (it === "lourd" ? 3 : 0) - w.armure);
-    }
+    function hitOf(y, iy) { var ey = foeDef(y.eid); if (iy === "incant") return roll(parseDice(ey.sort || "2d4+2")); return Math.max(0, roll(parseDice(ey.degats || "1d6")) + (iy === "lourd" ? 3 : 0) - w.armure); }
+    function foeHit() { return hitOf(x, it); }
     function hurt(n, half) { if (half) n = Math.ceil(n / 2); s.vig = Math.max(0, s.vig - n); L.push('<span class="ko">−' + n + " Vigueur</span>"); }
+    function dmg(y, n) { var b = y.vig; y.vig = Math.max(0, y.vig - n); if (b > 0 && y.vig <= 0 && group) L.push('<span class="ok">' + esc(y.nom) + " tombe.</span>"); }
     function strike(mult, bonus, label) {
       var ok = test(eff(w.atk) - (+e.def || 0) + (bonus || 0), label);
-      if (ok) { var d = roll(w.dmg) * (mult || 1); c.vig = Math.max(0, c.vig - d); L.push('<span class="ok">touché, −' + d + (mult > 1 ? " (double)" : "") + "</span>"); }
+      if (ok) { var d = roll(w.dmg) * (mult || 1); L.push('<span class="ok">touché, −' + d + (mult > 1 ? " (double)" : "") + "</span>"); dmg(x, d); }
       return ok;
     }
     if (a === "observer") {
-      c.observed = true;
-      if (test(eff("sag"), "Tu observes")) { c.revealed = true; L.push("Tu lis son geste : " + INTENTS[it].toLowerCase() + "."); }
+      x.observed = true;
+      if (test(eff("sag"), "Tu observes")) { x.revealed = true; L.push("Tu lis son geste : " + INTENTS[x.it].toLowerCase() + "."); }
       else L.push("Tu ne lis rien.");
       c.log.unshift("<b>Tour " + c.turn + "</b> · " + L.join(" "));
-      refresh(); return;
+      refreshPv(); return;
     }
     if (a.indexOf("mot:") === 0) {
       var m = D.mots[a.slice(4)], cost = +m.cout || 0, fromMana = Math.min(s.man, cost), rest = cost - fromMana;
       s.man -= fromMana; P.usure += rest;
       L.push('<span class="mag">' + esc(m.nom) + " (−" + fromMana + " Mana" + (rest ? ", +" + rest + " Usure" : "") + ")</span>");
-      if (m.effet === "annule") L.push("L'action ennemie est annulée.");
+      if (m.effet === "annule") { L.push("L'action ennemie est annulée."); cancelled = true; }
+      else if (m.effet === "entraver") { L.push(esc(x.nom) + " est entravé : il n'agit pas ce tour, ni le suivant."); x.bound = 1; cancelled = true; }
       else {
-        if (m.effet === "degats") { var d = roll(parseDice(m.valeur || "2d6")); c.vig = Math.max(0, c.vig - d); L.push('<span class="ok">−' + d + "</span>"); }
+        if (m.effet === "degats") { var d = roll(parseDice(m.valeur || "2d6")); L.push('<span class="ok">−' + d + "</span>"); dmg(x, d); }
+        if (m.effet === "zone") { var dz = Math.ceil(roll(parseDice(m.valeur || "2d6")) / (group ? 2 : 1)); L.push('<span class="ok">' + (group ? "tous : " : "") + "−" + dz + "</span>"); alive(c).forEach(function (y) { dmg(y, dz); }); }
         if (m.effet === "soin") { var hl = roll(parseDice(m.valeur || "1d6")); s.vig = Math.min(eff("vigMax"), s.vig + hl); L.push('<span class="ok">+' + hl + " Vigueur</span>"); }
-        if (c.vig > 0 && it !== "garde") hurt(foeHit());
+        if (x.vig > 0 && it !== "garde") hurt(foeHit());
       }
     } else if (a === "frapper") {
-      if (it === "lourd") { strike(1, 0, "Tu frappes en premier"); if (c.vig > 0) hurt(foeHit()); }
-      else if (it === "rapides") { strike(1, 0, "Échange de coups"); if (c.vig > 0) hurt(foeHit()); }
+      if (it === "lourd") { strike(1, 0, "Tu frappes en premier"); if (x.vig > 0) hurt(foeHit()); }
+      else if (it === "rapides") { strike(1, 0, "Échange de coups"); if (x.vig > 0) hurt(foeHit()); }
       else if (it === "garde") { strike(1, 3, "Tu frappes sa garde ouverte"); }
-      else { if (strike(1, 0, "Tu frappes pour briser le sort")) L.push("Le sort se dissipe."); else if (c.vig > 0) hurt(foeHit()); }
+      else { if (strike(1, 0, "Tu frappes pour briser le sort")) L.push("Le sort se dissipe."); else if (x.vig > 0) hurt(foeHit()); }
     } else if (a === "esquiver") {
       if (it === "garde") L.push("Il ne frappait pas : tour perdu.");
       else if (test(real.esquiver, "Tu esquives")) { if (it === "lourd") strike(2, 0, "Contre-attaque"); }
@@ -1485,23 +1503,40 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else if (it === "incant") { L.push("On ne pare pas la thanergie."); hurt(foeHit()); }
       else { var ok = test(real.parer, "Tu pares"); if (ok && it === "lourd") hurt(foeHit(), true); else if (!ok) hurt(foeHit()); }
     } else if (a === "prudente") {
-      if (it === "garde") L.push("Il ne frappait pas : tour perdu.");
+      careful = true;
+      if (it === "garde") L.push("Garde prudente : il ne frappait pas.");
       else { L.push("Garde prudente."); hurt(foeHit(), true); }
     }
-    c.log.unshift("<b>Tour " + c.turn + " · " + INTENTS[it] + "</b> · " + L.join(" "));
-    if (c.vig <= 0) { c.over = "win"; c.butin = applyFx(is.butin); var fe = tempTick("combat"); if (fe.length) c.log.unshift(fe.join(" ")); }
+    var F = [];
+    function support(y) {
+      var ey = foeDef(y.eid), cands = alive(c).filter(function (z) { return z !== y && z.vig < z.max; }).sort(function (p, q) { return p.vig / p.max - q.vig / q.max; });
+      if (!cands.length) { F.push(esc(y.nom) + " se tient en retrait."); return; }
+      var z = cands[0], n = Math.min(z.max - z.vig, roll(parseDice(ey.soin || "1d6+1"))); z.vig += n; F.push('<span class="mag">' + esc(y.nom) + " soigne " + esc(z.nom) + " : +" + n + "</span>");
+    }
+    if (group) {
+      c.foes.forEach(function (y) {
+        if (y === x || y.vig <= 0 || y.it === "garde" || y.it === "entrave") return;
+        if (y.it === "soutien") { support(y); return; }
+        var n = Math.ceil(hitOf(y, y.it) / ((y.it === "incant" ? 1 : 2) * (careful ? 2 : 1)));
+        if (n <= 0) { F.push(esc(y.nom) + " (flanc) : ton armure encaisse."); return; }
+        s.vig = Math.max(0, s.vig - n); F.push('<span class="ko">' + esc(y.nom) + " (" + (y.it === "incant" ? "sort" : "flanc") + ") : −" + n + "</span>");
+      });
+      if (x.it === "soutien" && x.vig > 0 && !cancelled) support(x);
+    }
+    c.log.unshift("<b>Tour " + c.turn + " · " + (group ? esc(x.nom) + " : " : "") + INTENTS[x.it] + "</b> · " + L.join(" ") + (F.length ? "<br>" + F.join(" · ") : ""));
+    if (!alive(c).length) { c.over = "win"; c.butin = applyFx(is.butin); var fe = tempTick("combat"); if (fe.length) c.log.unshift(fe.join(" ")); }
     else if (s.vig <= 0) c.over = "lose";
     else {
       var ft = tempTick("tours"); if (ft.length) c.log.unshift(ft.join(" "));
-      c.idx++; c.turn++;
-      if (c.phase === 1 && lines(String(e.cycle2 || "").replace(/,/g, "\n")).length && c.vig <= c.max / 2) {
-        c.phase = 2; c.idx = 0;
-        c.log.unshift('<span class="mag">' + esc(genre(e.phase || "Il change de rythme.", P.setup.genre)) + "</span>");
-      }
-      newTurn(c);
+      c.turn++;
+      alive(c).forEach(function (y) {
+        var ey = foeDef(y.eid); y.idx++;
+        if (y.phase === 1 && lines(String(ey.cycle2 || "").replace(/,/g, "\n")).length && y.vig <= y.max / 2) { y.phase = 2; y.idx = 0; c.log.unshift('<span class="mag">' + (group ? esc(y.nom) + " : " : "") + esc(genre(ey.phase || "Il change de rythme.", P.setup.genre)) + "</span>"); }
+        newTurn(y);
+      });
+      fixTarget(c);
     }
-    refresh();
-    function refresh() { var el = document.getElementById("previewBox"); el.replaceWith(previewPanel()); }
+    refreshPv();
   }
 
   /* =====================================================================
@@ -1720,7 +1755,12 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
         if (!is.succes || !D.passages[is.succes]) add("erreur", p, "Le test n'a pas de passage pour la réussite.");
         if (!is.echec || !D.passages[is.echec]) add("erreur", p, "Le test n'a pas de passage pour l'échec.");
       } else if (is.type === "combat") {
-        if (!is.ennemi || !D.ennemis[is.ennemi]) add("erreur", p, "Combat sans ennemi.");
+        var fo = (is.ennemis && is.ennemis.length ? is.ennemis : [is.ennemi]);
+        if (!fo.some(function (id) { return id && D.ennemis[id]; })) add("erreur", p, "Combat sans ennemi.");
+        else if (fo.some(function (id) { return !id || !D.ennemis[id]; })) add("attention", p, "Une ligne d'ennemi du combat est vide.");
+        var vt = fo.reduce(function (n, id) { return n + (+(D.ennemis[id] || {}).vig || 0); }, 0);
+        if (fo.length > 1 && vt > 32) add("attention", p, "Combat de groupe très dur : " + vt + " de Vigueur ennemie au total.");
+        fo.forEach(function (id) { var en = D.ennemis[id]; if (en && /soutien|soin/i.test((en.cycle1 || "") + (en.cycle2 || "")) && fo.length < 2) add("attention", p, "« " + en.nom + " » a un soutien dans son cycle mais combat seul : il perdra ces tours."); });
         if (!is.victoire || !D.passages[is.victoire]) add("erreur", p, "Le combat n'a pas de passage pour la victoire.");
       } else if (is.type === "dialogue") {
         if (!is.pnj || !D.pnj[is.pnj]) add("erreur", p, "Dialogue sans personnage.");
@@ -1819,9 +1859,10 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       ["nom", "Nom", "text"], ["def", "Défense (malus à tes frappes)", "number"], ["menace", "Menace (malus à tes esquives et parades)", "number"],
       ["vig", "Vigueur", "number"], ["degats", "Dégâts (ex. : 1d6+1)", "text"], ["sort", "Dégâts de l'incantation (ignore l'armure)", "text"],
       ["voile", "Intentions voilées (Ordre et boss)", "bool"], ["tutoriel", "Combat d'apprentissage : aides affichées", "bool"],
+      ["role", "Rôle en combat de groupe", "rolesel"], ["soin", "Soin du soutien (ex. : 1d6+1)", "text"],
       ["cycle1", "Cycle (ex. : lourd, rapides, garde)", "text"], ["cycle2", "Cycle de seconde phase, à mi-Vigueur (facultatif)", "text"],
       ["ph_lourd", "Phrases du coup lourd (une par ligne)", "area"], ["ph_rapides", "Phrases des coups rapides", "area"],
-      ["ph_garde", "Phrases de la garde basse", "area"], ["ph_incant", "Phrases de l'incantation", "area"],
+      ["ph_garde", "Phrases de la garde basse", "area"], ["ph_incant", "Phrases de l'incantation", "area"], ["ph_soutien", "Phrases du soutien (intention « soutien » dans le cycle)", "area"],
       ["voile_a", "Postures voilées : coup lourd OU coups rapides", "area"], ["voile_b", "Postures voilées : garde basse OU incantation", "area"],
       ["phase", "Phrase du changement de phase", "area"], ["mort", "Phrase de mort", "area"], ["notes", "Notes", "area"]
     ] },
@@ -1901,7 +1942,8 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       else if (f[2] === "dureesel") el = selectEl([["combat", "Jusqu'à la fin du combat (le prochain, s'il est bu avant)"], ["tours", "Un nombre de tours de combat"], ["passages", "Un nombre de passages"]], cur[k] || "combat", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "atksel") el = selectEl([["for", "Force"], ["hab", "Habileté"]], cur[k] || "for", function (v) { cur[k] = v; touch(); });
       else if (f[2] === "bonussel") el = selectEl([["", "aucune"], ["for", "Force"], ["hab", "Habileté"], ["sag", "Sagesse"], ["cha", "Chance"], ["vigMax", "Vigueur maximum"], ["manMax", "Mana maximum"], ["cp", "Capacité de port"]], cur[k] || "", function (v) { cur[k] = v; touch(); });
-      else if (f[2] === "motsel") el = selectEl([["annule", "Annule l'action de l'ennemi"], ["degats", "Inflige des dégâts (ignore la Défense)"], ["soin", "Rend de la Vigueur"], ["recit", "Aucun : seulement dans le récit"]], cur[k] || "recit", function (v) { cur[k] = v; touch(); });
+      else if (f[2] === "rolesel") el = selectEl([["", "aucun (combattant ordinaire)"], ["sbire", "sbire : peu de Vigueur, en nombre"], ["meneur", "meneur : +1 Menace aux autres tant qu'il vit"], ["soutien", "soutien : soigne ses alliés quand son cycle dit « soutien »"]], cur[k] || "", function (v) { cur[k] = v; touch(); });
+      else if (f[2] === "motsel") el = selectEl([["annule", "Annule l'action de l'ennemi"], ["entraver", "Entrave la cible : elle n'agit ni ce tour ni le suivant"], ["zone", "Dégâts à tous les ennemis (moitié en groupe)"], ["degats", "Inflige des dégâts (ignore la Défense)"], ["soin", "Rend de la Vigueur"], ["recit", "Aucun : seulement dans le récit"]], cur[k] || "recit", function (v) { cur[k] = v; touch(); });
       if (f[2] === "longarea") el = h("textarea", { value: cur[k] || "", rows: 16, style: "min-height:320px;font-family:Georgia,serif;font-size:15px;font-weight:400;line-height:1.55", oninput: function (e) { cur[k] = e.target.value; touch(); } });
       var wide = f[2] === "area" || f[2] === "longarea";
       grid.appendChild(f[2] === "bool" ? h("label", { class: "f inline" }, el, f[1]) : h("label", { class: "f", style: wide ? "grid-column:1/-1" : null }, f[1], el));
@@ -1912,6 +1954,20 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       h("p", { text: "Coup lourd : lever, armer, à deux mains, prendre de l'élan. Coups rapides : enchaîner, coups secs, rapprochés, harceler. Garde basse : vaciller, chercher son équilibre, reprendre son souffle. Incantation : lueur, murmure, paume, thanergie qui s'accumule. Une posture voilée ne laisse jamais que deux possibilités." })));
     main.appendChild(b);
     wrap.appendChild(main);
+    return wrap;
+  }
+  function foesEditor(is, touch, rerender) {
+    if (!is.ennemis || !is.ennemis.length) is.ennemis = [is.ennemi || ""];
+    function sync() { is.ennemis = is.ennemis.slice(0, 3); is.ennemi = is.ennemis.filter(Boolean)[0] || ""; }
+    sync();
+    var wrap = h("div", { class: "sec" }, h("strong", { text: is.ennemis.length > 1 ? "Ennemis (combat de groupe)" : "Ennemi" }));
+    is.ennemis.forEach(function (id, i) {
+      wrap.appendChild(h("div", { class: "mini-row" }, selectEl(catOpts("ennemis", "— choisir un ennemi —"), id || "", function (v) { is.ennemis[i] = v; sync(); touch(); rerender(); }),
+        is.ennemis.length > 1 ? h("button", { class: "btn small danger", onclick: function () { is.ennemis.splice(i, 1); sync(); touch(); rerender(); } }, "Retirer") : null));
+    });
+    if (is.ennemis.length < 3) wrap.appendChild(h("div", null, h("button", { class: "btn small", onclick: function () { is.ennemis.push(""); sync(); touch(); rerender(); } }, "+ ajouter un ennemi au combat")));
+    var tot = is.ennemis.reduce(function (n, id) { return n + (+(D.ennemis[id] || {}).vig || 0); }, 0);
+    if (is.ennemis.length > 1) wrap.appendChild(h("span", { class: "hint", text: "Jusqu'à 3 ennemis. Le joueur choisit sa cible ; les autres frappent de flanc (moitié des dégâts, sorts en entier). Un même ennemi peut figurer deux fois : il devient « A » et « B ». Vigueur totale du groupe : " + tot + " (conseil : pas plus de ~1,5 × un adversaire seul, soit ~30)." }));
     return wrap;
   }
   /* PNJ : répliques, réponses, sujets */
@@ -2008,7 +2064,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       var is = p.issue || {};
       (is.choix || []).forEach(function (c) { scan(c.cond); scan(c.effets); });
       scan(is.butin);
-      if (is.ennemi === id || is.pnj === id) hit = true;
+      if (is.ennemi === id || is.pnj === id || (is.ennemis || []).indexOf(id) >= 0) hit = true;
       if (is.type === "dialogue" && D.pnj[is.pnj] && col !== "pnj") pnjListes(D.pnj[is.pnj]).forEach(function (x) { scan(x.fx); scan(x.cond); });
       return hit;
     }).map(function (p) { return p.id; });
@@ -2023,7 +2079,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       var is = p.issue || {};
       (is.choix || []).forEach(function (c) { scan(c.cond); scan(c.effets); });
       scan(is.butin);
-      if (col === "ennemis" && is.ennemi === id) n++;
+      if (col === "ennemis" && (is.ennemi === id || (is.ennemis || []).indexOf(id) >= 0)) n++;
       if (col === "pnj" && is.pnj === id) n++;
     });
     if (col !== "pnj") Object.keys(D.pnj).forEach(function (k) { pnjListes(D.pnj[k]).forEach(function (x) { scan(x.fx); scan(x.cond); }); (D.pnj[k].sujets || []).forEach(function (su) { if (su.info === id) n++; }); });
@@ -2256,7 +2312,7 @@ details.help code { background: var(--panel-2); border: 1px solid var(--line); b
       var is = p.issue || {};
       if (is.type === "choix") (is.choix || []).forEach(function (c) { out.push("- " + genre(c.texte || "(sans texte)", g, "[Nom]") + " → " + (D.passages[c.cible] ? D.passages[c.cible].num : "?") + ((c.cond || []).length ? " *(si " + condTxt(c.cond) + ")*" : "")); });
       if (is.type === "test") out.push("- Test de " + STATS[is.stat || "hab"] + (is.modif ? " (" + is.modif + ")" : "") + " : réussite → " + ((D.passages[is.succes] || {}).num || "?") + ", échec → " + ((D.passages[is.echec] || {}).num || "?"));
-      if (is.type === "combat") out.push("- Combat : " + ((D.ennemis[is.ennemi] || {}).nom || "?") + " ; victoire → " + ((D.passages[is.victoire] || {}).num || "?") + ((is.butin || []).length ? " ; butin : " + is.butin.length + " élément(s)" : ""));
+      if (is.type === "combat") out.push("- Combat : " + ((is.ennemis && is.ennemis.length ? is.ennemis : [is.ennemi]).map(function (id) { return (D.ennemis[id] || {}).nom || "?"; }).join(", ")) + " ; victoire → " + ((D.passages[is.victoire] || {}).num || "?") + ((is.butin || []).length ? " ; butin : " + is.butin.length + " élément(s)" : ""));
       if (is.type === "dialogue") { out.push("- Dialogue avec " + ((D.pnj[is.pnj] || {}).nom || "?") + (is.apres ? " ; après → " + ((D.passages[is.apres] || {}).num || "?") : "")); (is.choix || []).forEach(function (c) { out.push("- " + genre(c.texte || "(sans texte)", g, "[Nom]") + " → " + (D.passages[c.cible] ? D.passages[c.cible].num : "?")); }); }
       if (is.type === "fin") out.push("- **" + (is.fin || "Fin") + "** : " + (is.titreFin || ""));
       out.push("");

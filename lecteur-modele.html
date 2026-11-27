@@ -166,6 +166,17 @@ button { cursor: pointer; }
 .fenetre .corps { padding: 18px 22px 22px; }
 .combat { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 22px; }
 @media (max-width: 760px) { .combat { grid-template-columns: minmax(0, 1fr); } }
+.groupe { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 8px; margin-bottom: 14px; }
+.groupe .foe { display: flex; flex-direction: column; align-items: stretch; gap: 3px; text-align: left; padding: 8px 10px; background: #18161c; border: 1px solid var(--trait); border-radius: 5px; color: var(--texte); cursor: pointer; font: inherit; }
+.groupe .foe .n { display: flex; justify-content: space-between; gap: 6px; align-items: baseline; }
+.groupe .foe b { font-size: 15px; }
+.groupe .foe small { font-size: 12.5px; color: var(--texte-doux); }
+.groupe .foe .role { text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; color: var(--or, #c9a45a); }
+.groupe .foe .j { display: block; height: 6px; background: var(--trait-doux); overflow: hidden; }
+.groupe .foe .j i { display: block; height: 100%; background: var(--sang); }
+.groupe .foe.sel { border-color: var(--ivoire); box-shadow: 0 0 0 1px var(--ivoire) inset; }
+.groupe .foe .cible { color: var(--ivoire); font-weight: 700; letter-spacing: .06em; }
+.groupe .foe.mort { opacity: .4; cursor: default; }
 .duel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .duel .n { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .duel .n b { font-family: var(--police-titre); font-weight: 400; font-size: 21px; color: var(--ivoire); }
@@ -399,7 +410,7 @@ img, .illus { image-rendering: pixelated; }
   L.passages = L.passages || {}; L.objets = L.objets || {}; L.mots = L.mots || {}; L.infos = L.infos || {}; L.fragments = L.fragments || {}; L.ennemis = L.ennemis || {}; L.pnj = L.pnj || {};
   var STATS = { for: "Force", hab: "Habileté", sag: "Sagesse", vig: "Vigueur", man: "Mana", cha: "Chance", lum: "Lumière" };
   function LUMMAX() { return Math.max(1, +R.lumMax || 10); }
-  var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation" };
+  var INTENTS = { lourd: "Coup lourd", rapides: "Coups rapides", garde: "Garde basse", incant: "Incantation", soutien: "Soutien", entrave: "Entravé" };
   var EXPL = { for: "Frapper, parer, forcer une porte.", hab: "Esquiver, grimper, se faufiler.", sag: "Percevoir, comprendre, lire les gestes d'un ennemi." };
   var ACTES = ["", "I", "II", "III"];
   var CLE = "kepultum:" + (L.id || R.titre || "livre");
@@ -700,7 +711,7 @@ img, .illus { image-rendering: pixelated; }
     P.vus[pid] = true;
     if (p.debutActe) { var snap = clone(P); snap.save = null; snap.combat = null; snap.test = null; snap.dial = null; P.save = snap; }
     var is = p.issue || {};
-    if (is.type === "combat") P.combat = nouveauCombat(is.ennemi);
+    if (is.type === "combat") P.combat = nouveauCombat(is);
     if (is.type === "fin") { UI.ecran = "fin"; noterFin(pid); }
     else UI.ecran = "jeu";
     var secours = secoursLumiere(); if (secours) P.fx = (P.fx || []).concat(secours);
@@ -720,114 +731,178 @@ img, .illus { image-rendering: pixelated; }
     });
   }
   function toutesFins() { return Object.keys(L.passages).filter(function (k) { return (L.passages[k].issue || {}).type === "fin"; }); }
-  function reprendreActe() { UI.fragNouv = []; var sv = P.save, morts = P.morts; P = clone(sv); P.save = sv; P.morts = morts; P.combat = null; P.test = null; P.dial = null; var p = L.passages[P.cur]; if (p && (p.issue || {}).type === "combat") P.combat = nouveauCombat(p.issue.ennemi); P.fx = ["Tu reprends au début de l'acte."]; UI.ecran = "jeu"; sauver(); render(); window.scrollTo(0, 0); }
+  function reprendreActe() { UI.fragNouv = []; var sv = P.save, morts = P.morts; P = clone(sv); P.save = sv; P.morts = morts; P.combat = null; P.test = null; P.dial = null; var p = L.passages[P.cur]; if (p && (p.issue || {}).type === "combat") P.combat = nouveauCombat(p.issue); P.fx = ["Tu reprends au début de l'acte."]; UI.ecran = "jeu"; sauver(); render(); window.scrollTo(0, 0); }
 
   /* ---------- Combat ---------- */
   function ennemi(id) { return L.ennemis[id] || null; }
-  function cycleDe(e, c) {
+  var ROLES = { sbire: "sbire", meneur: "meneur", soutien: "soutien" };
+  function cycleDe(e, x) {
     var c2 = lines(String(e.cycle2 || "").replace(/,/g, "\n")), c1 = lines(String(e.cycle1 || "lourd, rapides, garde").replace(/,/g, "\n"));
-    return (c.phase === 2 && c2.length ? c2 : c1).map(function (x) { x = x.toLowerCase(); return x.indexOf("lourd") >= 0 ? "lourd" : x.indexOf("rapide") >= 0 ? "rapides" : x.indexOf("garde") >= 0 ? "garde" : x.indexOf("incant") >= 0 ? "incant" : "lourd"; });
+    return (x.phase === 2 && c2.length ? c2 : c1).map(function (k) { k = k.toLowerCase(); return k.indexOf("lourd") >= 0 ? "lourd" : k.indexOf("rapide") >= 0 ? "rapides" : k.indexOf("garde") >= 0 ? "garde" : k.indexOf("incant") >= 0 ? "incant" : k.indexOf("soutien") >= 0 || k.indexOf("soin") >= 0 ? "soutien" : "lourd"; });
   }
-  function nouveauCombat(eid) { var e = ennemi(eid); if (!e) return { manque: true }; var c = { eid: eid, vig: +e.vig || 10, max: +e.vig || 10, tour: 1, idx: 0, phase: 1, journal: [], fini: null }; tourSuivant(c); return c; }
-  function tourSuivant(c) {
-    var e = ennemi(c.eid), cy = cycleDe(e, c);
-    c.it = cy[c.idx % cy.length]; c.vu = !e.voile || talent() === "pisteur"; c.observe = false;
-    c.dit = pick(lines(e["ph_" + c.it])) || INTENTS[c.it] + ".";
-    c.voile = pick(lines(c.it === "lourd" || c.it === "rapides" ? e.voile_a : e.voile_b)) || "Tu ne parviens pas à lire son geste.";
+  function idsCombat(is) { var l = (is.ennemis || []).filter(function (id) { return id && ennemi(id); }); if (!l.length && is.ennemi && ennemi(is.ennemi)) l = [is.ennemi]; return l.slice(0, 3); }
+  function nouveauCombat(is) {
+    var ids = idsCombat(is || {}); if (!ids.length) return { manque: true };
+    var nb = {}, vu = {}; ids.forEach(function (id) { nb[id] = (nb[id] || 0) + 1; });
+    var c = { tour: 1, journal: [], fini: null, cible: 0, ens: ids.map(function (id) { var e = ennemi(id); vu[id] = (vu[id] || 0) + 1; return { eid: id, nom: (e.nom || "Ennemi") + (nb[id] > 1 ? " " + "ABC"[vu[id] - 1] : ""), vig: +e.vig || 10, max: +e.vig || 10, idx: 0, phase: 1 }; }) };
+    c.ens.forEach(tourSuivant);
+    var m = c.ens.filter(function (x) { return (ennemi(x.eid) || {}).role === "meneur"; })[0]; if (m && c.ens.length > 1) c.cible = c.ens.indexOf(m);
+    return c;
   }
-  function seuils(c, e, w, aides) {
-    var it = c.it, t = { frapper: eff(w.atk) - (+e.def || 0), esquiver: eff("hab") - (+e.menace || 0), parer: eff("for") - (+e.menace || 0) + w.parade, notes: { frapper: [], esquiver: [], parer: [] } };
+  function migrerCombat(c) {
+    if (c && !c.manque && !c.ens && c.eid) { c.ens = [{ eid: c.eid, nom: (ennemi(c.eid) || {}).nom || "Ennemi", vig: c.vig, max: c.max, idx: c.idx || 0, phase: c.phase || 1, it: c.it, vu: c.vu, observe: c.observe, dit: c.dit, voile: c.voile }]; c.cible = 0; }
+    if (c && c.ens && (!c.ens[c.cible] || c.ens[c.cible].vig <= 0)) { var v = vivants(c)[0]; if (v) c.cible = c.ens.indexOf(v); }
+    return c;
+  }
+  function vivants(c) { return c.ens.filter(function (x) { return x.vig > 0; }); }
+  function meneurPres(c, x) { return c.ens.some(function (y) { return y !== x && y.vig > 0 && (ennemi(y.eid) || {}).role === "meneur"; }); }
+  function resIt(it) { return it === "soutien" || it === "entrave" ? "garde" : it; }
+  function tourSuivant(x) {
+    var e = ennemi(x.eid);
+    x.observe = false;
+    if (x.entrave) { x.entrave = 0; x.it = "entrave"; x.vu = true; x.dit = "Entravé : il ne peut pas agir ce tour."; x.voile = x.dit; return; }
+    var cy = cycleDe(e, x);
+    x.it = cy[x.idx % cy.length]; x.vu = !e.voile || talent() === "pisteur";
+    x.dit = pick(lines(e["ph_" + x.it])) || (x.it === "soutien" ? "Il se tourne vers un allié blessé." : INTENTS[x.it] + ".");
+    x.voile = pick(lines(x.it === "lourd" || x.it === "rapides" ? e.voile_a : e.voile_b)) || "Tu ne parviens pas à lire son geste.";
+  }
+  function seuils(c, x, e, w, aides) {
+    var it = resIt(x.it), men = (+e.menace || 0) + (meneurPres(c, x) ? 1 : 0);
+    var t = { frapper: eff(w.atk) - (+e.def || 0), esquiver: eff("hab") - men, parer: eff("for") - men + w.parade, notes: { frapper: [], esquiver: [], parer: [] } };
+    if (men > (+e.menace || 0)) { t.notes.esquiver.push("−1 meneur"); t.notes.parer.push("−1 meneur"); }
     if (w.fam === "dague") { t.esquiver += 2; t.notes.esquiver.push("+2 dague"); }
     if (w.fam === "epee") { t.frapper += 1; t.parer += 1; t.notes.frapper.push("+1 épée"); t.notes.parer.push("+1 épée"); }
     if (w.fam === "arc") { t.parer -= 2; t.notes.parer.push("−2 arc"); }
     if (c.bonusFrappe) { t.frapper += c.bonusFrappe; t.notes.frapper.push("+" + c.bonusFrappe + " mur de bouclier"); }
     if (enRage()) t.notes.frapper.push("rage : +2 dégâts");
-    if (w.fam === "hache" && it === "garde" && (aides || c.vu)) t.notes.frapper.push("hache : dégâts ×2");
-    if (w.fam === "arc" && it === "incant" && (aides || c.vu)) { t.frapper += 3; t.notes.frapper.push("+3 arc"); }
+    if (w.fam === "hache" && it === "garde" && (aides || x.vu)) t.notes.frapper.push("hache : dégâts ×2");
+    if (w.fam === "arc" && it === "incant" && (aides || x.vu)) { t.frapper += 3; t.notes.frapper.push("+3 arc"); }
     if (aides) { if (it === "garde" && w.fam !== "hache") t.frapper += 3; if (it === "rapides" || it === "incant") t.esquiver -= 3; if (it === "lourd") t.parer -= 5; if (it === "incant") t.parer = null; }
     return t;
   }
   function coutMot(m, c) { var k = +m.cout || 0; return talent() === "savoir" && !c.motDit ? Math.max(0, k - 2) : k; }
   function victoire(c) { c.fini = "victoire"; c.butin = appliquer((L.passages[P.cur].issue || {}).butin); var fe = tempTick("combat"); if (fe.length) c.journal.unshift(esc(fe.join(" "))); }
-  function engager() {
-    var c = P.combat, e = ennemi(c.eid), w = arme(); c.engage = true;
-    if (w.fam === "arc" && !c.tir) {
-      c.tir = true;
-      var t = seuils(c, e, w, true).frapper, r = rnd(20), ok = r <= t, J = '<b>Tir d\'ouverture</b> · <span class="dé ' + (ok ? "ok" : "ko") + '">' + r + "</span>";
-      if (ok) { var dg = roll(w.dmg) + (enRage() ? 2 : 0); c.vig = Math.max(0, c.vig - dg); J += ' <span class="ok">touché, −' + dg + "</span>"; } else J += " manqué";
-      c.journal.unshift(J);
-      if (c.vig <= 0) victoire(c);
-    }
-    sauver(); render();
-  }
+  function engager() { var c = migrerCombat(P.combat); c.engage = true; sauver(); render(); }
+  function cibler(i) { var c = P.combat; if (c.ens[i] && c.ens[i].vig > 0) { c.cible = i; sauver(); render(); } }
   function agir(a) {
-    var c = P.combat, e = ennemi(c.eid), w = arme(), s = P.s, it = c.it, J = [], vrai = seuils(c, e, w, true);
+    var c = migrerCombat(P.combat), w = arme(), s = P.s, J = [];
+    var x = c.ens[c.cible], e = ennemi(x.eid), it = resIt(x.it), vrai = seuils(c, x, e, w, true), groupe = c.ens.length > 1;
+    var prudente = false, pareOk = false, annule = false;
     function d(r, ok) { return '<span class="dé ' + (ok ? "ok" : "ko") + '">' + r + "</span>"; }
     function test(t, lbl) {
       var r = rnd(20), ok = t !== null && r <= t;
       if (!ok && t !== null && talent() === "main" && !c.main) { c.main = true; J.push(d(r, false) + '<span class="mag">la main de l\'Inconnu dévie le sort…</span>'); r = rnd(20); ok = r <= t; }
       J.push(d(r, ok) + lbl + " (" + r + (ok ? " ≤ " : " &gt; ") + (t === null ? "—" : t) + ")"); return ok;
     }
-    function coup() { if (it === "incant") return roll(parseDice(e.sort || "2d4+2")); return Math.max(0, roll(parseDice(e.degats || "1d6")) + (it === "lourd" ? 3 : 0) - w.armure); }
+    function coupDe(y, iy) { var ey = ennemi(y.eid); if (iy === "incant") return roll(parseDice(ey.sort || "2d4+2")); return Math.max(0, roll(parseDice(ey.degats || "1d6")) + (iy === "lourd" ? 3 : 0) - w.armure); }
+    function coup() { return coupDe(x, it); }
     function blesse(n, moitie) { if (moitie) n = Math.ceil(n / (moitie === true ? 2 : moitie)); s.vig = Math.max(0, s.vig - n); J.push('<span class="ko">−' + n + " Vigueur</span>"); }
+    function toucher(y, dg) { var avant = y.vig; y.vig = Math.max(0, y.vig - dg); if (avant > 0 && y.vig <= 0 && groupe) J.push('<span class="ok">' + esc(y.nom) + " tombe.</span>"); return dg - avant; }
+    function autre(y) { return vivants(c).filter(function (z) { return z !== y; })[0]; }
+    function degArme() { return roll(w.dmg) + (enRage() ? 2 : 0); }
     function frappe(mult, bonusT, lbl) {
       var ok = test(vrai.frapper + (bonusT || 0), lbl); c.bonusFrappe = 0;
       if (ok) {
-        var dg = roll(w.dmg) * (mult || 1) + (enRage() ? 2 : 0); c.vig = Math.max(0, c.vig - dg);
+        var dg = roll(w.dmg) * (mult || 1) + (enRage() ? 2 : 0);
         J.push('<span class="ok">touché, −' + dg + (mult === 2 ? " (double)" : mult === 3 ? " (triple)" : "") + "</span>");
+        var exces = toucher(x, dg);
+        if (x.vig <= 0 && w.fam === "hache" && exces > 0) { var z = autre(x); if (z) { J.push('<span class="ok">balayage : ' + esc(z.nom) + " −" + exces + "</span>"); toucher(z, exces); } }
         if (w.fam === "baton" && s.man < eff("manMax")) { s.man += 1; J.push('<span class="mag">+1 Mana</span>'); }
       }
       return ok;
     }
     if (a === "observer") {
-      c.observe = true;
-      if (test(eff("sag"), "Tu observes")) { c.vu = true; J.push("Tu lis son geste : " + INTENTS[it].toLowerCase() + "."); } else J.push("Tu ne lis rien.");
+      x.observe = true;
+      if (test(eff("sag"), "Tu observes " + (groupe ? esc(x.nom) : ""))) { x.vu = true; J.push("Tu lis son geste : " + (INTENTS[x.it] || "").toLowerCase() + "."); } else J.push("Tu ne lis rien.");
       c.journal.unshift("<b>Tour " + c.tour + "</b> · " + J.join(" ")); sauver(); render(); return;
+    }
+    if (a === "tir") {
+      c.tir = true;
+      if (test(seuils(c, x, e, w, true).frapper, "Tir d'ouverture" + (groupe ? " sur " + esc(x.nom) : ""))) { var dt = degArme(); J.push('<span class="ok">touché, −' + dt + "</span>"); toucher(x, dt); }
+      c.journal.unshift("<b>Avant le combat</b> · " + J.join(" "));
+      if (!vivants(c).length) victoire(c); else migrerCombat(c);
+      sauver(); render(); return;
     }
     if (a.indexOf("mot:") === 0) {
       var m = L.mots[a.slice(4)], cout = coutMot(m, c), pris = Math.min(s.man, cout), reste = cout - pris;
       s.man -= pris; P.usure += reste; c.motDit = true;
       J.push('<span class="mag">' + esc(m.nom) + (reste ? " · la magie te ronge : +" + reste + " Usure" : "") + "</span>");
-      if (m.effet === "annule") J.push("Son action est annulée.");
+      if (m.effet === "annule") { J.push("Son action est annulée."); annule = true; }
+      else if (m.effet === "entraver") { J.push(esc(x.nom) + " est entravé : il n'agit pas ce tour, ni le suivant."); annule = true; x.entrave = 1; }
       else {
-        if (m.effet === "degats") { var dg = roll(parseDice(m.valeur || "2d6")); c.vig = Math.max(0, c.vig - dg); J.push('<span class="ok">−' + dg + "</span>"); }
+        if (m.effet === "degats") { var dg = roll(parseDice(m.valeur || "2d6")); J.push('<span class="ok">−' + dg + "</span>"); toucher(x, dg); }
+        if (m.effet === "zone") { var dz = Math.ceil(roll(parseDice(m.valeur || "2d6")) / (groupe ? 2 : 1)); J.push('<span class="ok">' + (groupe ? "tous : " : "") + "−" + dz + "</span>"); vivants(c).forEach(function (y) { toucher(y, dz); }); }
         if (m.effet === "soin") { var so = roll(parseDice(m.valeur || "1d6")); s.vig = Math.min(eff("vigMax"), s.vig + so); J.push('<span class="ok">+' + so + " Vigueur</span>"); }
-        if (c.vig > 0 && it !== "garde") blesse(coup());
+        if (x.vig > 0 && it !== "garde") blesse(coup());
       }
     } else if (a.indexOf("obj:") === 0) {
       var oid = a.slice(4), o = L.objets[oid];
       J.push(esc(o.nom) + " : " + esc(utiliser(oid).join(", ")));
       if (it !== "garde") blesse(coup());
     } else if (a === "frapper") {
-      if (it === "lourd") { frappe(1, 0, "Tu frappes en premier"); if (c.vig > 0) blesse(coup()); }
-      else if (it === "rapides") { var tl = frappe(1, 0, "Échange de coups"); if (c.vig > 0) { if (tl && w.fam === "lance") J.push("Ton allonge le tient à distance."); blesse(coup(), tl && w.fam === "lance"); } }
+      if (it === "lourd") { frappe(1, 0, "Tu frappes en premier"); if (x.vig > 0) blesse(coup()); }
+      else if (it === "rapides") { var tl = frappe(1, 0, "Échange de coups"); if (x.vig > 0) { if (tl && w.fam === "lance") J.push("Ton allonge le tient à distance."); blesse(coup(), tl && w.fam === "lance"); } }
       else if (it === "garde") { frappe(w.fam === "hache" ? 2 : 1, 0, w.fam === "hache" ? "Ta hache fend sa garde" : "Tu frappes sa garde ouverte"); }
-      else { if (frappe(1, 0, "Tu frappes pour briser le sort")) J.push("Le sort se dissipe."); else if (c.vig > 0) blesse(coup()); }
+      else { if (frappe(1, 0, "Tu frappes pour briser le sort")) J.push("Le sort se dissipe."); else if (x.vig > 0) blesse(coup()); }
     } else if (a === "esquiver") {
       if (it === "garde") J.push("Il ne frappait pas : tour perdu.");
-      else if (test(vrai.esquiver, "Tu esquives")) { if (it === "lourd") frappe(talent() === "traitre" ? 3 : 2, 0, talent() === "traitre" ? "Coup en traître" : "Contre-attaque"); }
+      else if (test(vrai.esquiver, "Tu esquives")) {
+        if (it === "lourd") {
+          frappe(talent() === "traitre" ? 3 : 2, 0, talent() === "traitre" ? "Coup en traître" : "Contre-attaque");
+          if (x.vig <= 0 && talent() === "traitre") { var z = autre(x); if (z) { var dgt = degArme(); J.push('<span class="ok">dans la foulée, ' + esc(z.nom) + " −" + dgt + "</span>"); toucher(z, dgt); } }
+        }
+      }
       else blesse(coup());
     } else if (a === "parer") {
       if (it === "garde") J.push("Il ne frappait pas : tour perdu.");
       else if (it === "incant") { J.push("On ne pare pas la thanergie."); blesse(coup()); }
       else {
-        var ok = test(vrai.parer, "Tu pares");
+        var ok = test(vrai.parer, "Tu pares"); pareOk = ok;
         if (ok && it === "lourd") blesse(coup(), talent() === "mur" ? 4 : 2);
         else if (ok && it === "rapides" && talent() === "mur") { c.bonusFrappe = 2; J.push("Mur de bouclier : +2 à ton prochain coup."); }
         else if (!ok) blesse(coup());
       }
     } else if (a === "prudente") {
-      if (enRage()) J.push("La rage t'empêche de te protéger.");
-      else if (it === "garde") J.push("Il ne frappait pas : tour perdu."); else { J.push("Garde prudente."); blesse(coup(), true); }
+      prudente = true;
+      if (enRage()) { prudente = false; J.push("La rage t'empêche de te protéger."); }
+      else if (it === "garde") J.push("Garde prudente : il ne frappait pas.");
+      else { J.push("Garde prudente."); blesse(coup(), true); }
     }
-    c.journal.unshift("<b>Tour " + c.tour + " · " + INTENTS[it].toLowerCase() + "</b><br>" + J.join(" "));
-    if (c.vig <= 0) victoire(c);
+    var tete = "<b>Tour " + c.tour + " · " + (groupe ? esc(x.nom) + " : " : "") + (INTENTS[x.it] || "").toLowerCase() + "</b><br>" + J.join(" ");
+    /* flancs et soutiens */
+    var F = [];
+    function soutien(y) {
+      var ey = ennemi(y.eid), cands = vivants(c).filter(function (z) { return z !== y && z.vig < z.max; }).sort(function (p, q) { return p.vig / p.max - q.vig / q.max; });
+      if (!cands.length) { F.push(esc(y.nom) + " se tient en retrait."); return; }
+      var z = cands[0], n = Math.min(z.max - z.vig, roll(parseDice(ey.soin || "1d6+1"))); z.vig += n;
+      F.push('<span class="mag">' + esc(y.nom) + " soigne " + esc(z.nom) + " : +" + n + "</span>");
+    }
+    if (groupe) {
+      var tenu = w.fam === "lance", couvert = talent() === "mur" && pareOk;
+      c.ens.forEach(function (y) {
+        if (y === x || y.vig <= 0) return;
+        if (y.it === "garde" || y.it === "entrave") return;
+        if (y.it === "soutien") { soutien(y); return; }
+        if (tenu && y.it !== "incant") { tenu = false; F.push(esc(y.nom) + " : ton allonge le tient à distance."); return; }
+        if (couvert && y.it !== "incant") { couvert = false; F.push(esc(y.nom) + " : ton bouclier couvre ce flanc."); return; }
+        var n = Math.ceil(coupDe(y, y.it) / ((y.it === "incant" ? 1 : 2) * (prudente ? 2 : 1)));
+        if (n <= 0) { F.push(esc(y.nom) + " (flanc) : ton armure encaisse."); return; }
+        s.vig = Math.max(0, s.vig - n); F.push('<span class="ko">' + esc(y.nom) + " (" + (y.it === "incant" ? "sort" : "flanc") + ") : −" + n + "</span>");
+      });
+      if (x.it === "soutien" && x.vig > 0 && !annule) soutien(x);
+    }
+    c.journal.unshift(tete + (F.length ? "<br>" + F.join(" · ") : ""));
+    if (!vivants(c).length) victoire(c);
     else if (s.vig <= 0) { c.fini = "defaite"; mourir(); render(); return; }
     else {
       var ft = tempTick("tours"); if (ft.length) c.journal.unshift(esc(ft.join(" ")));
-      c.idx++; c.tour++;
-      if (c.phase === 1 && lines(String(e.cycle2 || "").replace(/,/g, "\n")).length && c.vig <= c.max / 2) { c.phase = 2; c.idx = 0; c.journal.unshift('<span class="mag">' + esc(genre(e.phase || "Il change de rythme.")) + "</span>"); }
-      tourSuivant(c);
+      c.tour++;
+      vivants(c).forEach(function (y) {
+        var ey = ennemi(y.eid); y.idx++;
+        if (y.phase === 1 && lines(String(ey.cycle2 || "").replace(/,/g, "\n")).length && y.vig <= y.max / 2) { y.phase = 2; y.idx = 0; c.journal.unshift('<span class="mag">' + (groupe ? esc(y.nom) + " : " : "") + esc(genre(ey.phase || "Il change de rythme.")) + "</span>"); }
+        tourSuivant(y);
+      });
+      migrerCombat(c);
     }
     sauver(); render();
   }
@@ -1035,38 +1110,51 @@ img, .illus { image-rendering: pixelated; }
     } else if (is.type === "combat") {
       if (P.combat && P.combat.manque) a.appendChild(h("p", { class: "vide", text: "(Combat sans ennemi : passage à compléter dans l'atelier.)" }));
       else if (P.combat && !P.combat.engage && !(P.combat.journal || []).length) {
-        var en = ennemi(P.combat.eid) || {};
+        var cg = migrerCombat(P.combat);
         a.appendChild(h("div", { class: "engager" }, h("button", { class: "b-prim", onclick: function () { engager(); } }, "Engager le combat"),
-          h("span", { class: "label", text: (en.nom || "Ennemi") + " · pas de fuite possible" })));
+          h("span", { class: "label", text: cg.ens.map(function (x) { return x.nom; }).join(" · ") + " · pas de fuite possible" })));
       }
     }
     return w;
   }
   function fenetreCombat() {
-    var c = P.combat, e = ennemi(c.eid), w = arme(), s = P.s, aides = !!e.tutoriel, t = seuils(c, e, w, aides), is = L.passages[P.cur].issue || {};
+    var c = migrerCombat(P.combat), x = c.ens[c.cible], e = ennemi(x.eid), w = arme(), s = P.s, aides = !!e.tutoriel, t = seuils(c, x, e, w, aides), is = L.passages[P.cur].issue || {}, groupe = c.ens.length > 1;
     var corps = h("div", { class: "corps combat" });
     var gauche = h("div");
+    if (groupe && c.fini !== "victoire") {
+      var row = h("div", { class: "groupe", role: "group", "aria-label": "Choisir ta cible" });
+      c.ens.forEach(function (y, i) {
+        var ey = ennemi(y.eid) || {}, mort = y.vig <= 0, sel = i === c.cible && !mort;
+        row.appendChild(h("button", { class: "foe" + (sel ? " sel" : "") + (mort ? " mort" : ""), disabled: mort ? "disabled" : null, "aria-pressed": sel ? "true" : "false", onclick: function () { cibler(i); } },
+          h("span", { class: "n" }, h("b", { text: y.nom }), ey.role && ROLES[ey.role] ? h("small", { class: "role", text: ROLES[ey.role] }) : null),
+          h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * y.vig / y.max) + "%" })),
+          h("small", { text: mort ? "À terre" : y.vig + " / " + y.max + " · " + (y.vu || aides ? (INTENTS[y.it] || "") : "geste voilé") }),
+          sel ? h("small", { class: "cible", text: "▲ ta cible" }) : null));
+      });
+      gauche.appendChild(row);
+    }
     gauche.appendChild(h("div", { class: "duel" },
-      h("div", null, h("div", { class: "n" }, h("b", { text: e.nom || "Ennemi" })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * c.vig / c.max) + "%" })), h("small", { text: "Vigueur " + c.vig + " / " + c.max })),
-      h("div", null, h("div", { class: "n" }, h("span", { style: "font-weight:700;font-size:18px", text: nomHeros() }), h("small", { text: w.nom.toLowerCase() + " · armure " + w.armure })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / Math.max(1, eff("vigMax"))) + "%" })), h("small", { text: "Vigueur " + s.vig + " / " + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }))));
+      h("div", null, h("div", { class: "n" }, h("b", { text: x.nom || e.nom || "Ennemi" })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * x.vig / x.max) + "%" })), h("small", { text: "Vigueur " + x.vig + " / " + x.max })),
+      h("div", null, h("div", { class: "n" }, h("span", { style: "font-weight:700;font-size:18px", text: nomHeros() }), h("small", { text: w.nom.toLowerCase() + " · armure " + w.armure })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / eff("vigMax")) + "%" })), h("small", { text: "Vigueur " + s.vig + " / " + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }))));
     var ta = TALENTS[talent()], fa = FAMILLES[w.fam];
     if ((ta || fa) && c.fini !== "victoire") gauche.appendChild(h("p", { class: "gains", style: "margin:8px 0 0;color:var(--texte-doux)", text: [ta ? "Talent : " + ta.nom : "", fa ? "Arme : " + fa.nom + " (" + fa.txt.split(" :")[0].toLowerCase() + ")" : "", enRage() ? "EN RAGE" : ""].filter(Boolean).join(" · ") }));
     if ((P.temp || []).length && c.fini !== "victoire") gauche.appendChild(h("p", { class: "gains", style: "margin:8px 0 0", text: "En cours : " + P.temp.map(function (t) { return tempTxt(t); }).join(" · ") }));
     if (c.fini === "victoire") {
-      gauche.appendChild(h("div", { class: "victoire" }, h("p", { class: "ok", text: e.mort ? genre(e.mort) : "Ton adversaire s'effondre." }),
+      gauche.appendChild(h("div", { class: "victoire" }, h("p", { class: "ok", text: groupe ? "Le dernier d'entre eux s'effondre. Le silence retombe." : e.mort ? genre(e.mort) : "Ton adversaire s'effondre." }),
         (c.butin || []).length ? h("div", { class: "butin" }, h("span", { class: "label", text: "Butin" }), h("ul", null, c.butin.map(function (t) { return h("li", { text: t }); }))) : null,
         h("div", null, h("button", { class: "b-prim", "data-focus": true, onclick: function () { P.combat = null; aller(is.victoire, null, true); } }, "Continuer"))));
     } else {
-      gauche.appendChild(h("div", { class: "intention" }, h("span", { class: "label", text: "Tour " + c.tour + (c.vu ? "" : " · il prépare quelque chose") }), h("p", { text: genre(c.vu ? c.dit : c.voile) }),
-        aides ? h("div", { class: "aide", text: INTENTS[c.it] + " · " + { lourd: "lent et puissant : esquive, puis contre-attaque.", rapides: "une série de coups secs : pare-les.", garde: "il est vulnérable : frappe !", incant: "frappe pour interrompre le sort." }[c.it] }) : null));
+      gauche.appendChild(h("div", { class: "intention" }, h("span", { class: "label", text: "Tour " + c.tour + (groupe ? " · " + x.nom : "") + (x.vu ? "" : " · il prépare quelque chose") }), h("p", { text: genre(x.vu ? x.dit : x.voile) }),
+        aides ? h("div", { class: "aide", text: INTENTS[x.it] + " · " + { lourd: "lent et puissant : esquive, puis contre-attaque.", rapides: "une série de coups secs : pare-les.", garde: "il est vulnérable : frappe !", incant: "frappe pour interrompre le sort." , soutien: "il soigne ses alliés : frappe-le !", entrave: "il ne peut rien faire : frappe !" }[x.it] }) : null));
       var acts = h("div", { class: "actions" });
       function b(a, l, sub, cls, dis) { acts.appendChild(h("button", { class: cls || null, disabled: dis ? "disabled" : null, onclick: function () { agir(a); } }, h("b", { text: l }), h("small", { text: sub }))); }
       function tv(v, k) { return (v === null ? "impossible" : v + " ou moins") + (t.notes[k].length ? " (" + t.notes[k].join(", ") + ")" : ""); }
       b("frapper", "Frapper", STATS[w.atk] + " · " + tv(t.frapper, "frapper"));
       b("esquiver", "Esquiver", "Habileté · " + tv(t.esquiver, "esquiver"));
       b("parer", "Parer", "Force · " + tv(t.parer, "parer"));
-      b("prudente", "Garde prudente", enRage() ? "impossible : tu es en rage" : "moitié des dégâts", null, enRage());
-      if (e.voile && talent() !== "pisteur") b("observer", "Observer", c.observe ? "déjà tenté ce tour" : "Sagesse · " + eff("sag") + " ou moins", "obs", c.observe);
+      b("prudente", "Garde prudente", enRage() ? "impossible : tu es en rage" : groupe ? "moitié des dégâts, flancs compris" : "moitié des dégâts", null, enRage());
+      if (w.fam === "arc" && !c.tir && c.tour === 1) b("tir", "Tir d'ouverture", "gratuit" + (groupe ? ", sur ta cible" : "") + " · " + seuils(c, x, e, w, true).frapper + " ou moins", "obs");
+      if (e.voile && talent() !== "pisteur") b("observer", "Observer", x.observe ? "déjà tenté ce tour" : "Sagesse · " + eff("sag") + " ou moins", "obs", x.observe);
       P.mots.forEach(function (mid) { var m = L.mots[mid]; if (!m || !m.effet || m.effet === "recit") return; var cm = coutMot(m, c), manque = Math.max(0, cm - s.man); b("mot:" + mid, m.nom, cm + " Mana" + (cm < (+m.cout || 0) ? " (savoir ancien)" : "") + (manque ? " · " + manque + " en Usure" : ""), "mot"); });
       Object.keys(P.inv).forEach(function (oid) { var o = L.objets[oid]; if (!utilisable(o)) return; b("obj:" + oid, o.nom, effetObjet(o) + " · " + P.inv[oid] + " restant" + (P.inv[oid] > 1 ? "s" : "")); });
       gauche.appendChild(acts);
@@ -1319,7 +1407,7 @@ img, .illus { image-rendering: pixelated; }
 
   /* ---------- Mort, fin, fin de démo ---------- */
   function ecranMort() {
-    var p = L.passages[P.cur] || {}, c = P.combat, e = c && ennemi(c.eid);
+    var p = L.passages[P.cur] || {}, c = P.combat && !P.combat.manque ? migrerCombat(P.combat) : null, e = c && c.ens.length === 1 ? { nom: c.ens[0].nom } : c ? { nom: c.ens.map(function (x) { return x.nom; }).join(", ") } : null;
     var s = h("main", { class: "ecran-mort pad" });
     var noir = P.causeMort === "noir";
     s.appendChild(h("h1", { class: "titre-f", text: noir ? "Les ténèbres t'engloutissent" : "Tu tombes" }));
