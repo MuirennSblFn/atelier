@@ -177,6 +177,36 @@ button { cursor: pointer; }
 .groupe .foe.sel { border-color: var(--ivoire); box-shadow: 0 0 0 1px var(--ivoire) inset; }
 .groupe .foe .cible { color: var(--ivoire); font-weight: 700; letter-spacing: .06em; }
 .groupe .foe.mort { opacity: .4; cursor: default; }
+.best-dl { margin: 16px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.best-dl dt { color: var(--texte-doux); margin: 0 0 2px; }
+.best-dl dd { margin: 0; font-size: 17px; }
+.best-nouv { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin: 10px 0; }
+.combat .zone { margin: 0 0 8px; color: var(--texte-doux); }
+.groupe.seul { grid-template-columns: 1fr; }
+.groupe .foe { position: relative; }
+.groupe.seul .foe b { font-family: var(--police-titre); font-weight: 400; font-size: 24px; color: var(--ivoire); }
+.groupe .foe .geste { align-self: flex-start; margin-top: 2px; font-size: 12.5px; padding: 1px 6px; border: 1px dashed var(--trait); color: var(--texte-doux); }
+.groupe .foe .geste.lu { border-style: solid; color: var(--texte); }
+.groupe .foe .geste.it-lourd, .groupe .foe .geste.it-incant { border-color: var(--sang-clair); color: var(--sang-clair); }
+.groupe .foe .geste.it-garde, .groupe .foe .geste.it-entrave { border-color: var(--thanergie); color: var(--thanergie); }
+.groupe .foe .geste.it-soutien { border-color: var(--or, #c9a45a); color: var(--or, #c9a45a); }
+.heros { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 8px 18px; align-items: center; margin: 14px 0 0; padding: 10px 12px; border: 1px solid var(--trait); background: rgba(0,0,0,.25); }
+.heros .id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.heros .id b { font-size: 18px; color: var(--ivoire); }
+.heros .id small { font-size: 12.5px; color: var(--texte-doux); }
+.heros .id .rage { color: var(--sang-clair); font-weight: 700; letter-spacing: .08em; }
+.heros .jauges { display: flex; flex-direction: column; gap: 6px; }
+.ligne-j { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.ligne-j .t { font-size: 11.5px; color: var(--texte-doux); text-transform: uppercase; letter-spacing: .06em; }
+.ligne-j b { font-size: 13.5px; white-space: nowrap; }
+.ligne-j .j { display: block; height: 10px; background: var(--trait-doux); overflow: hidden; }
+.ligne-j .j i { display: block; height: 100%; transition: width .4s; }
+.ligne-j.vie .j i, .jauge.vie .j i { background-color: var(--ivoire) !important; }
+.ligne-j.vie.bas .j i, .jauge.vie.bas .j i { background-color: var(--sang-clair) !important; animation: vacille 1.2s ease-in-out infinite; }
+.ligne-j.vie.bas b, .jauge.vie.bas b { color: var(--sang-clair); }
+.ligne-j.mana .j i { background-color: var(--thanergie); }
+.groupe .foe .j i { background-color: var(--sang); }
+@media (max-width: 640px) { .heros { grid-template-columns: 1fr; } }
 .duel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 .duel .n { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .duel .n b { font-family: var(--police-titre); font-weight: 400; font-size: 21px; color: var(--ivoire); }
@@ -363,8 +393,8 @@ img, .illus { image-rendering: pixelated; }
 /* Barre du haut : jauges segmentées */
 .barre { background: #0a0807; border-bottom: var(--px) solid var(--trait-doux); }
 .jauge .t, .usure .t { font-family: 'Silkscreen', var(--police-ui); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
-.jauge .j, .duel .j { height: 12px; background: #000; box-shadow: 0 0 0 2px var(--trait); }
-.jauge .j i, .duel .j i { background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0) 0 7px, #000 7px 9px); transition: width .4s steps(6); }
+.jauge .j, .duel .j, .ligne-j .j, .groupe .foe .j { height: 12px; background: #000; box-shadow: 0 0 0 2px var(--trait); }
+.jauge .j i, .duel .j i, .ligne-j .j i, .groupe .foe .j i { background-image: repeating-linear-gradient(90deg, rgba(0,0,0,0) 0 7px, #000 7px 9px) !important; transition: width .4s steps(6); }
 .jauge .j i { background-color: var(--sang); }
 .jauge.mana .j i { background-color: var(--thanergie); }
 .jauge.lum .j i { background-color: var(--lumiere); }
@@ -781,7 +811,15 @@ img, .illus { image-rendering: pixelated; }
     return t;
   }
   function coutMot(m, c) { var k = +m.cout || 0; return talent() === "savoir" && !c.motDit ? Math.max(0, k - 2) : k; }
-  function victoire(c) { c.fini = "victoire"; c.butin = appliquer((L.passages[P.cur].issue || {}).butin); var fe = tempTick("combat"); if (fe.length) c.journal.unshift(esc(fe.join(" "))); }
+  function bestiaire() { var b = load(":bestiaire") || {}; Object.keys(b).forEach(function (k) { if (!L.ennemis[k]) delete b[k]; }); return b; }
+  function ennemisDuLivre() { var out = []; Object.keys(L.passages).forEach(function (k) { var is = L.passages[k].issue || {}; if (is.type === "combat") idsCombat(is).forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); }); }); return out; }
+  function noterBestiaire(c) {
+    var b = load(":bestiaire") || {}, is = L.passages[P.cur].issue || {}, nouv = [];
+    var gains = (is.butin || []).filter(function (f) { return f.type === "donner" && L.objets[f.val]; }).map(function (f) { return L.objets[f.val].nom; });
+    c.ens.forEach(function (y) { var k = y.eid; if (!b[k]) { b[k] = { n: 0, butin: [] }; nouv.push(k); } b[k].n++; gains.forEach(function (g) { if (b[k].butin.indexOf(g) < 0) b[k].butin.push(g); }); });
+    store(":bestiaire", b); return nouv;
+  }
+  function victoire(c) { c.fini = "victoire"; c.nouvBest = noterBestiaire(c); c.butin = appliquer((L.passages[P.cur].issue || {}).butin); var fe = tempTick("combat"); if (fe.length) c.journal.unshift(esc(fe.join(" "))); }
   function engager() { var c = migrerCombat(P.combat); c.engage = true; sauver(); render(); }
   function cibler(i) { var c = P.combat; if (c.ens[i] && c.ens[i].vig > 0) { c.cible = i; sauver(); render(); } }
   function agir(a) {
@@ -796,7 +834,7 @@ img, .illus { image-rendering: pixelated; }
     }
     function coupDe(y, iy) { var ey = ennemi(y.eid); if (iy === "incant") return roll(parseDice(ey.sort || "2d4+2")); return Math.max(0, roll(parseDice(ey.degats || "1d6")) + (iy === "lourd" ? 3 : 0) - w.armure); }
     function coup() { return coupDe(x, it); }
-    function blesse(n, moitie) { if (moitie) n = Math.ceil(n / (moitie === true ? 2 : moitie)); s.vig = Math.max(0, s.vig - n); J.push('<span class="ko">−' + n + " Vigueur</span>"); }
+    function blesse(n, moitie) { if (moitie) n = Math.ceil(n / (moitie === true ? 2 : moitie)); if (n <= 0) { J.push("ton armure encaisse"); return; } s.vig = Math.max(0, s.vig - n); J.push('<span class="ko">−' + n + " Vigueur</span>"); }
     function toucher(y, dg) { var avant = y.vig; y.vig = Math.max(0, y.vig - dg); if (avant > 0 && y.vig <= 0 && groupe) J.push('<span class="ok">' + esc(y.nom) + " tombe.</span>"); return dg - avant; }
     function autre(y) { return vivants(c).filter(function (z) { return z !== y; })[0]; }
     function degArme() { return roll(w.dmg) + (enRage() ? 2 : 0); }
@@ -920,6 +958,7 @@ img, .illus { image-rendering: pixelated; }
     else if (UI.modal === "fins") calque.appendChild(modalFins());
     else if (UI.modal === "carnet") calque.appendChild(modalCarnet());
     else if (UI.modal === "menu") calque.appendChild(modalMenu());
+    else if (UI.modal === "bestiaire") calque.appendChild(modalBestiaire());
     else if (UI.ecran === "jeu" && P && P.dial) calque.appendChild(fenetreDialogue());
     else if (UI.ecran === "jeu" && P && P.combat && !P.combat.manque && (P.combat.engage || (P.combat.journal || []).length)) calque.appendChild(fenetreCombat());
     var focus = calque.querySelector("[data-focus]") || app.querySelector("[data-focus]");
@@ -946,6 +985,7 @@ img, .illus { image-rendering: pixelated; }
       h("button", { class: "b-sec", onclick: function () { UI.modal = "fins"; render(); } }, "Fins · " + fins.filter(function (x) { return L.passages[x]; }).length + " / " + toutesFins().length),
       h("button", { class: "b-sec", onclick: function () { UI.modal = "regles"; render(); } }, "Règles du jeu")));
     if (Object.keys(L.fragments).length) nav.appendChild(h("button", { class: "b-sec", onclick: function () { UI.fragLu = null; UI.modal = "carnet"; render(); } }, "Carnet · " + fragsTrouves().length + " / " + Object.keys(L.fragments).length + " fragments"));
+    if (Object.keys(bestiaire()).length) nav.appendChild(h("button", { class: "b-sec", onclick: function () { UI.bestLu = null; UI.modal = "bestiaire"; render(); } }, "Bestiaire · " + Object.keys(bestiaire()).length + " / " + ennemisDuLivre().length + " créatures"));
     s.appendChild(nav);
     s.appendChild(h("p", { class: "pied", text: [R.auteur ? "Un livre de " + R.auteur : "", L.demo ? "Démo du " + L.demo : ""].filter(Boolean).join(" · ") }));
     return s;
@@ -1056,12 +1096,13 @@ img, .illus { image-rendering: pixelated; }
       h("span", { class: "titre-f", text: R.titre }),
       h("span", { class: "acte", text: nomActe(p.acte) }),
       h("div", { class: "stats" },
-        h("span", { class: "jauge", title: "Vigueur" }, h("span", { class: "t", text: "Vigueur" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / Math.max(1, vm)) + "%" })), h("b", { text: s.vig + " / " + vm })),
+        h("span", { class: "jauge vie" + (s.vig <= vm * 0.3 ? " bas" : ""), title: "Vigueur" }, h("span", { class: "t", text: "Vigueur" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / Math.max(1, vm)) + "%" })), h("b", { text: s.vig + " / " + vm })),
         h("span", { class: "jauge mana", title: "Mana" }, h("span", { class: "t", text: "Mana" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.man / Math.max(1, mm)) + "%" })), h("b", { text: String(s.man) })),
         P.lumOn ? h("span", { class: "jauge lum" + ((s.lum || 0) <= 3 ? " bas" : ""), title: "Lumière : tu perds 1 point à chaque passage" }, h("span", { class: "t", text: "Lumière" }), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * (s.lum || 0) / LUMMAX()) + "%" })), h("b", { text: (s.lum || 0) + "/" + LUMMAX() })) : null,
         h("span", { class: "usure" }, h("span", { class: "t", style: "color:var(--texte-doux)", text: "Usure " }), h("b", { text: String(P.usure) })),
         h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.modal = "fiche"; render(); } }, "Fiche"),
         Object.keys(L.fragments).length ? h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.fragLu = null; UI.modal = "carnet"; render(); } }, "Carnet") : null,
+        Object.keys(bestiaire()).length ? h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.bestLu = null; UI.modal = "bestiaire"; render(); } }, "Bestiaire") : null,
         h("button", { class: "b-sec", style: "padding:7px 14px", onclick: function () { UI.modal = "menu"; render(); } }, "Menu")));
   }
   function ecranJeu() {
@@ -1121,31 +1162,37 @@ img, .illus { image-rendering: pixelated; }
     var c = migrerCombat(P.combat), x = c.ens[c.cible], e = ennemi(x.eid), w = arme(), s = P.s, aides = !!e.tutoriel, t = seuils(c, x, e, w, aides), is = L.passages[P.cur].issue || {}, groupe = c.ens.length > 1;
     var corps = h("div", { class: "corps combat" });
     var gauche = h("div");
-    if (groupe && c.fini !== "victoire") {
-      var row = h("div", { class: "groupe", role: "group", "aria-label": "Choisir ta cible" });
+    function barre(v, m, cls) { return h("span", { class: "j" + (cls ? " " + cls : "") }, h("i", { style: "width:" + Math.round(100 * Math.max(0, v) / Math.max(1, m)) + "%" })); }
+    if (c.fini !== "victoire") {
+      gauche.appendChild(h("p", { class: "label zone", text: groupe ? "Adversaires · touche une carte pour viser" : "Adversaire" }));
+      var row = h("div", { class: "groupe" + (groupe ? "" : " seul"), role: groupe ? "group" : null, "aria-label": groupe ? "Choisir ta cible" : null });
       c.ens.forEach(function (y, i) {
-        var ey = ennemi(y.eid) || {}, mort = y.vig <= 0, sel = i === c.cible && !mort;
-        row.appendChild(h("button", { class: "foe" + (sel ? " sel" : "") + (mort ? " mort" : ""), disabled: mort ? "disabled" : null, "aria-pressed": sel ? "true" : "false", onclick: function () { cibler(i); } },
-          h("span", { class: "n" }, h("b", { text: y.nom }), ey.role && ROLES[ey.role] ? h("small", { class: "role", text: ROLES[ey.role] }) : null),
-          h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * y.vig / y.max) + "%" })),
-          h("small", { text: mort ? "À terre" : y.vig + " / " + y.max + " · " + (y.vu || aides ? (INTENTS[y.it] || "") : "geste voilé") }),
-          sel ? h("small", { class: "cible", text: "▲ ta cible" }) : null));
+        var ey = ennemi(y.eid) || {}, mort = y.vig <= 0, sel = i === c.cible && !mort, lu = y.vu || aides;
+        var kids = [h("span", { class: "n" }, h("b", { text: y.nom }), ey.role && ROLES[ey.role] ? h("small", { class: "role", text: ROLES[ey.role] }) : null),
+          barre(y.vig, y.max), h("small", { class: "pv", text: mort ? "À terre" : "Vigueur " + y.vig + " / " + y.max }),
+          mort ? null : h("span", { class: "geste" + (lu ? " lu it-" + y.it : ""), text: lu ? INTENTS[y.it] || "" : "Geste voilé" }),
+          groupe && sel ? h("small", { class: "cible", text: "▲ ta cible" }) : null];
+        row.appendChild(groupe ? h("button", { class: "foe" + (sel ? " sel" : "") + (mort ? " mort" : ""), disabled: mort ? "disabled" : null, "aria-pressed": sel ? "true" : "false", onclick: function () { cibler(i); } }, kids) : h("div", { class: "foe sel" }, kids));
       });
       gauche.appendChild(row);
     }
-    gauche.appendChild(h("div", { class: "duel" },
-      h("div", null, h("div", { class: "n" }, h("b", { text: x.nom || e.nom || "Ennemi" })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * x.vig / x.max) + "%" })), h("small", { text: "Vigueur " + x.vig + " / " + x.max })),
-      h("div", null, h("div", { class: "n" }, h("span", { style: "font-weight:700;font-size:18px", text: nomHeros() }), h("small", { text: w.nom.toLowerCase() + " · armure " + w.armure })), h("span", { class: "j" }, h("i", { style: "width:" + Math.round(100 * s.vig / eff("vigMax")) + "%" })), h("small", { text: "Vigueur " + s.vig + " / " + eff("vigMax") + " · Mana " + s.man + (P.usure ? " · Usure " + P.usure : "") }))));
-    var ta = TALENTS[talent()], fa = FAMILLES[w.fam];
-    if ((ta || fa) && c.fini !== "victoire") gauche.appendChild(h("p", { class: "gains", style: "margin:8px 0 0;color:var(--texte-doux)", text: [ta ? "Talent : " + ta.nom : "", fa ? "Arme : " + fa.nom + " (" + fa.txt.split(" :")[0].toLowerCase() + ")" : "", enRage() ? "EN RAGE" : ""].filter(Boolean).join(" · ") }));
+    var ta = TALENTS[talent()], fa = FAMILLES[w.fam], vm = eff("vigMax"), mm = eff("manMax");
+    var heros = h("div", { class: "heros" },
+      h("div", { class: "id" }, h("b", { text: nomHeros() }), h("small", { text: [w.nom.toLowerCase() + " · armure " + w.armure, ta ? "talent : " + ta.nom.toLowerCase() : "", fa ? fa.nom.toLowerCase() : ""].filter(Boolean).join(" · ") }), enRage() ? h("small", { class: "rage", text: "EN RAGE" }) : null),
+      h("div", { class: "jauges" },
+        h("div", { class: "ligne-j vie" + (s.vig <= vm * 0.3 ? " bas" : "") }, h("span", { class: "t", text: "Vigueur" }), barre(s.vig, vm), h("b", { text: s.vig + " / " + vm })),
+        h("div", { class: "ligne-j mana" }, h("span", { class: "t", text: "Mana" }), barre(s.man, mm), h("b", { text: s.man + " / " + mm + (P.usure ? " · Usure " + P.usure : "") }))));
     if ((P.temp || []).length && c.fini !== "victoire") gauche.appendChild(h("p", { class: "gains", style: "margin:8px 0 0", text: "En cours : " + P.temp.map(function (t) { return tempTxt(t); }).join(" · ") }));
     if (c.fini === "victoire") {
+      gauche.appendChild(heros);
       gauche.appendChild(h("div", { class: "victoire" }, h("p", { class: "ok", text: groupe ? "Le dernier d'entre eux s'effondre. Le silence retombe." : e.mort ? genre(e.mort) : "Ton adversaire s'effondre." }),
         (c.butin || []).length ? h("div", { class: "butin" }, h("span", { class: "label", text: "Butin" }), h("ul", null, c.butin.map(function (t) { return h("li", { text: t }); }))) : null,
+        (c.nouvBest || []).length ? h("p", { class: "best-nouv" }, h("span", { class: "label", text: "Nouveau au bestiaire" }), c.nouvBest.map(function (k) { return h("button", { class: "b-lien", onclick: function () { UI.bestLu = k; UI.modal = "bestiaire"; render(); } }, (L.ennemis[k] || {}).nom || "?"); })) : null,
         h("div", null, h("button", { class: "b-prim", "data-focus": true, onclick: function () { P.combat = null; aller(is.victoire, null, true); } }, "Continuer"))));
     } else {
       gauche.appendChild(h("div", { class: "intention" }, h("span", { class: "label", text: "Tour " + c.tour + (groupe ? " · " + x.nom : "") + (x.vu ? "" : " · il prépare quelque chose") }), h("p", { text: genre(x.vu ? x.dit : x.voile) }),
         aides ? h("div", { class: "aide", text: INTENTS[x.it] + " · " + { lourd: "lent et puissant : esquive, puis contre-attaque.", rapides: "une série de coups secs : pare-les.", garde: "il est vulnérable : frappe !", incant: "frappe pour interrompre le sort." , soutien: "il soigne ses alliés : frappe-le !", entrave: "il ne peut rien faire : frappe !" }[x.it] }) : null));
+      gauche.appendChild(heros);
       var acts = h("div", { class: "actions" });
       function b(a, l, sub, cls, dis) { acts.appendChild(h("button", { class: cls || null, disabled: dis ? "disabled" : null, onclick: function () { agir(a); } }, h("b", { text: l }), h("small", { text: sub }))); }
       function tv(v, k) { return (v === null ? "impossible" : v + " ou moins") + (t.notes[k].length ? " (" + t.notes[k].join(", ") + ")" : ""); }
@@ -1394,6 +1441,46 @@ img, .illus { image-rendering: pixelated; }
     if (!tous.length) corps.appendChild(h("p", { class: "vide", text: "Aucun fragment dans ce livre." }));
     return fenetre("Carnet · " + trouves.length + " / " + tous.length, corps);
   }
+  function indiceAuto(e) {
+    var cy = cycleDe(e, { phase: 1 }), n = {}; cy.forEach(function (k) { n[k] = (n[k] || 0) + 1; });
+    var top = Object.keys(n).sort(function (a, b) { return n[b] - n[a]; })[0];
+    var t = [{ lourd: "Il affectionne les coups lourds : garde ton esquive prête.", rapides: "Il préfère les séries de coups rapides : une bonne parade paie.", garde: "Il se met souvent en garde : ce sont tes ouvertures.", incant: "Il incante souvent : frappe pour l'interrompre.", soutien: "Il soutient ses alliés : abats-le en premier." }[top] || ""];
+    if (n.incant && top !== "incant") t.push("Il manie aussi la thanergie.");
+    if (n.soutien && top !== "soutien") t.push("Il lui arrive de soigner ses alliés.");
+    if (e.voile) t.push("Ses gestes sont difficiles à lire : observe-le.");
+    if (lines(String(e.cycle2 || "").replace(/,/g, "\n")).length) t.push("Blessé, il change de rythme.");
+    return t.filter(Boolean).join(" ");
+  }
+  function modalBestiaire() {
+    var b = bestiaire(), tous = ennemisDuLivre(); Object.keys(b).forEach(function (k) { if (tous.indexOf(k) < 0) tous.push(k); });
+    var vus = tous.filter(function (k) { return b[k]; });
+    if (UI.bestLu && b[UI.bestLu] && L.ennemis[UI.bestLu]) {
+      var k = UI.bestLu, e = L.ennemis[k], m = b[k], corps = h("div", { class: "corps best" });
+      if (e.role && ROLES[e.role]) corps.appendChild(h("p", { class: "label", text: ROLES[e.role] }));
+      corps.appendChild(h("div", { class: "recit", html: riche(String(e.desc || "").trim() || "*Tu n'en sais guère plus que ce que tes yeux ont vu.*") }));
+      var dl = h("dl", { class: "best-dl" });
+      function ligne(t, v) { if (v) dl.appendChild(h("div", null, h("dt", { class: "label", text: t }), h("dd", typeof v === "string" ? { text: v } : null, typeof v === "string" ? null : v))); }
+      ligne("Vaincu", m.n + " fois");
+      ligne("Butin habituel", String(e.butinTxt || "").trim() || (m.butin.length ? m.butin.join(", ") : "Rien de notable."));
+      ligne("Indice", String(e.indice || "").trim() || indiceAuto(e));
+      if (m.n >= 3) {
+        var r = function (cy) { return cy.map(function (x) { return (INTENTS[x] || x).toLowerCase(); }).join(" → "); };
+        var c2 = lines(String(e.cycle2 || "").replace(/,/g, "\n")).length;
+        ligne("Rythme observé", r(cycleDe(e, { phase: 1 })) + (c2 ? " ; blessé : " + r(cycleDe(e, { phase: 2 })) : ""));
+      } else ligne("Rythme observé", "Encore " + (3 - m.n) + " victoire" + (3 - m.n > 1 ? "s" : "") + " pour le percer à jour.");
+      corps.appendChild(dl);
+      corps.appendChild(h("div", { style: "margin-top:18px" }, h("button", { class: "b-sec", onclick: function () { UI.bestLu = null; render(); } }, "← Retour au bestiaire")));
+      return fenetre(e.nom || "Créature", corps);
+    }
+    var corps2 = h("div", { class: "corps" }), ul = h("ul", { class: "fins" });
+    tous.forEach(function (k) {
+      var e = L.ennemis[k] || {};
+      ul.appendChild(b[k] ? h("li", { class: "frag-ok" }, h("button", { class: "frag-lien", onclick: function () { UI.bestLu = k; render(); } }, (e.nom || "Créature") + (b[k].n > 1 ? " · ×" + b[k].n : ""))) : h("li", { class: "cachee", text: "? ? ?" }));
+    });
+    corps2.appendChild(tous.length ? ul : h("p", { class: "vide", text: "Aucune créature dans ce livre." }));
+    corps2.appendChild(h("p", { class: "vide", style: "margin-top:12px", text: "Le bestiaire se souvient de toutes tes victoires, d'une partie à l'autre." }));
+    return fenetre("Bestiaire · " + vus.length + " / " + tous.length, corps2);
+  }
   function modalMenu() {
     var taille = load(":taille") || 20;
     function setTaille(t) { taille = Math.max(16, Math.min(26, t)); store(":taille", taille); document.documentElement.style.setProperty("--taille-recit", taille + "px"); render(); }
@@ -1402,6 +1489,7 @@ img, .illus { image-rendering: pixelated; }
         h("button", { class: "b-sec", "aria-label": "Réduire le texte", onclick: function () { setTaille(taille - 1); } }, "A−"), h("b", { text: taille + " px" }),
         h("button", { class: "b-sec", "aria-label": "Agrandir le texte", onclick: function () { setTaille(taille + 1); } }, "A+")),
       h("button", { class: "b-sec", onclick: function () { UI.modal = "regles"; render(); } }, "Règles du jeu"),
+      ennemisDuLivre().length ? h("button", { class: "b-sec", onclick: function () { UI.bestLu = null; UI.modal = "bestiaire"; render(); } }, "Bestiaire · " + Object.keys(bestiaire()).length + " / " + ennemisDuLivre().length) : null,
       h("button", { class: "b-sec", onclick: function () { UI.modal = null; UI.ecran = "titre"; render(); } }, "Retour à la page de titre (la partie est sauvegardée)")));
   }
 
